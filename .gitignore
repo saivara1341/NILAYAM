@@ -20,6 +20,9 @@ ios/App/build
 *.aab
 build_output.txt
 tsc_output.txt
+android/gradle_output.txt
+backend-java/target
+*.zip
 
 # Editor directories and files
 .vscode/*

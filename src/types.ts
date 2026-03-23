@@ -15,9 +15,13 @@ export interface BankDetails {
 }
 
 export interface PaymentMethods {
+    enableRazorpay?: boolean;
     upiId?: string;
+    mobileNumber?: string;
     qrCodeUrl?: string;
+    paymentInstructions?: string;
     bankDetails?: BankDetails;
+    payeeName?: string;
 }
 
 export interface Profile {
@@ -273,10 +277,15 @@ export interface TenantDocument {
 
 export interface Payment {
     id: string;
+    payment_type?: string;
     due_date: string;
+    created_at?: string;
     paid_date?: string;
     amount: number;
-    status: 'paid' | 'due';
+    status: 'paid' | 'due' | 'pending' | 'failed';
+    proof_url?: string;
+    payment_mode?: 'razorpay' | 'manual';
+    razorpay_payment_id?: string;
 }
 
 export type ChargeCategory =
@@ -400,6 +409,9 @@ export interface TenantDashboardData {
         id: string;
         due_date: string;
         amount: number;
+        status?: Payment['status'];
+        payment_mode?: Payment['payment_mode'];
+        proof_url?: string;
     } | null;
     recentAnnouncements: any[];
     openMaintenanceRequests: any[];

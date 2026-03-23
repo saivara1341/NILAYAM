@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
-import { acknowledgeTenantAgreement, markPaymentAsPaid, verifyAndUploadTenantDocument } from '@/services/api';
+import { acknowledgeTenantAgreement, canUseRazorpayForOwner, markPaymentAsPaid, submitManualPaymentProof, verifyAndUploadTenantDocument } from '@/services/api';
 import { TenantDashboardData, MaintenanceRequest, Announcement, TenantDocument } from '@/types';
 import Spinner from '@/components/ui/Spinner';
 import { useAuth } from '@/contexts/AuthContext';
-import { HomeIcon, CreditCardIcon, WrenchIcon, BellIcon, CameraIcon, ShieldCheckIcon, CloudUploadIcon, CheckCircleIcon, ShieldLockIcon, LeaseIcon } from '@/constants';
+import { HomeIcon, CreditCardIcon, WrenchIcon, BellIcon, CameraIcon, ShieldCheckIcon, CloudUploadIcon, CheckCircleIcon, ShieldLockIcon, LeaseIcon, BankIcon, QrCodeIcon } from '@/constants';
 import { RazorpayButton } from '@/components/payments/RazorpayButton';
 import { EmptyInboxIllustration, EmptyLedgerIllustration, QuietMaintenanceIllustration, WaitingHomeIllustration } from '@/components/ui/StateIllustrations';
 import { Link } from 'react-router-dom';
@@ -107,7 +107,110 @@ const ReminderPreview: React.FC<{ reminders: TenantDashboardData['reminders']; a
     </div>
 );
 
-// Mock BhimPaymentGateway removed in favor of real Razorpay integration
+const ManualPaymentCard: React.FC<{
+    data: TenantDashboardData;
+    tenantId: string;
+    onSubmitted: () => Promise<void>;
+}> = ({ data, tenantId, onSubmitted }) => {
+    const [proofFile, setProofFile] = useState<File | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const paymentMethods = data.landlordPaymentDetails;
+
+    if (!data.nextPayment) return null;
+
+    const handleSubmit = async () => {
+        if (!proofFile) {
+            alert('Please upload payment proof after completing the transfer.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await submitManualPaymentProof({
+                paymentId: data.nextPayment.id.startsWith('rent_due_') ? undefined : data.nextPayment.id,
+                tenantId,
+                houseId: data.tenancyDetails.house_id,
+                amount: data.nextPayment.amount,
+                paymentType: 'rent',
+                proofFile
+            });
+            setProofFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            await onSubmitted();
+            alert('Payment proof submitted. Your owner can verify it and mark it as received.');
+        } catch (error) {
+            console.error(error);
+            alert('Unable to submit payment proof right now.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '340ms' } as any}>
+            <div className="flex items-center gap-2">
+                <QrCodeIcon className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white">Manual Payment Options</h3>
+            </div>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                Complete the transfer using the owner details below, then upload your screenshot or receipt so the owner can verify the credit in their account.
+            </p>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {paymentMethods?.upiId && (
+                    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">UPI ID</p>
+                        <p className="mt-2 text-sm font-bold text-neutral-900 dark:text-white break-all">{paymentMethods.upiId}</p>
+                    </div>
+                )}
+                {paymentMethods?.mobileNumber && (
+                    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Owner Mobile</p>
+                        <p className="mt-2 text-sm font-bold text-neutral-900 dark:text-white">{paymentMethods.mobileNumber}</p>
+                    </div>
+                )}
+                {paymentMethods?.bankDetails?.accountNumber && (
+                    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-4 md:col-span-2">
+                        <div className="flex items-center gap-2">
+                            <BankIcon className="w-4 h-4 text-blue-600" />
+                            <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Bank Transfer</p>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2 text-sm">
+                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Account Holder:</span> {paymentMethods.bankDetails.accountHolder || 'Not set'}</p>
+                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Bank:</span> {paymentMethods.bankDetails.bankName || 'Not set'}</p>
+                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Account No:</span> {paymentMethods.bankDetails.accountNumber}</p>
+                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">IFSC:</span> {paymentMethods.bankDetails.ifsc || 'Not set'}</p>
+                        </div>
+                    </div>
+                )}
+                {paymentMethods?.qrCodeUrl && (
+                    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/50 p-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">QR Code</p>
+                        <img src={paymentMethods.qrCodeUrl} alt="Owner payment QR" className="mt-3 h-40 w-40 rounded-2xl border border-neutral-200 bg-white object-cover p-2" />
+                    </div>
+                )}
+                {paymentMethods?.paymentInstructions && (
+                    <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Owner Instructions</p>
+                        <p className="mt-2 text-sm text-amber-900 dark:text-amber-100 whitespace-pre-wrap">{paymentMethods.paymentInstructions}</p>
+                    </div>
+                )}
+            </div>
+            <div className="mt-5 rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <input type="file" ref={fileInputRef} onChange={(event) => setProofFile(event.target.files?.[0] || null)} className="hidden" accept="image/*,application/pdf" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-3 text-sm font-bold text-neutral-900 dark:text-white">
+                        {proofFile ? 'Change Payment Proof' : 'Upload Payment Proof'}
+                    </button>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">{proofFile ? proofFile.name : 'Screenshot, UPI receipt, or bank transfer slip'}</p>
+                    <button type="button" onClick={handleSubmit} disabled={submitting || !proofFile} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50 md:ml-auto">
+                        {submitting ? 'Submitting...' : 'Submit for Verification'}
+                    </button>
+                </div>
+            </div>
+        </Card>
+    );
+};
 
 
 const VerificationCard: React.FC<{ delay: string }> = ({ delay }) => {
@@ -200,6 +303,7 @@ const TenantDashboard: React.FC = () => {
         dashboardError
     } = useData();
     const [isAcknowledgingAgreement, setIsAcknowledgingAgreement] = useState(false);
+    const supportsRazorpay = canUseRazorpayForOwner(data?.landlordPaymentDetails);
 
     const handleConfirmPayment = async () => {
         if (!data?.nextPayment) return;
@@ -307,18 +411,27 @@ const TenantDashboard: React.FC = () => {
                 <InfoCard
                     title="Next Payment"
                     value={data.nextPayment ? `₹${data.nextPayment.amount.toLocaleString()}` : 'All Clear!'}
-                    subtext={data.nextPayment ? `Due ${new Date(data.nextPayment.due_date).toLocaleDateString()}` : 'Payment cycle current'}
+                    subtext={
+                        data.nextPayment
+                            ? data.nextPayment.status === 'pending' && data.nextPayment.payment_mode === 'manual'
+                                ? 'Proof submitted, waiting for owner verification'
+                                : data.nextPayment.status === 'failed'
+                                    ? 'Previous proof was not approved yet, please retry'
+                                    : `Due ${new Date(data.nextPayment.due_date).toLocaleDateString()}`
+                            : 'Payment cycle current'
+                    }
                     icon={<CreditCardIcon />}
                     delay="200ms"
                 >
-                    {data.nextPayment && (
+                    {data.nextPayment && supportsRazorpay && (
                         <RazorpayButton
                             amount={data.nextPayment.amount}
                             paymentType="rent"
-                            houseId={data.tenancyDetails.house_id} // Need to ensure house_id is available in data
+                            houseId={data.tenancyDetails.house_id}
                             tenantId={profile?.id || ''}
                             onSuccess={() => refreshData(true)}
                             buttonText="PAY NOW"
+                            disabledReason="Razorpay needs a live backend API and frontend key configuration."
                             className="text-[10px] py-2 px-4"
                         />
                     )}
@@ -341,6 +454,10 @@ const TenantDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-8">
+                    {data.nextPayment && !supportsRazorpay && (
+                        <ManualPaymentCard data={data} tenantId={profile?.id || ''} onSubmitted={() => refreshData(true)} />
+                    )}
+
                     <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms' } as any}>
                         <h3 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center gap-2">
                             <CameraIcon className="w-6 h-6 text-red-600 animate-pulse" /> Live Security

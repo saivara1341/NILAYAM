@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabase';
 import { CreditCard, Loader2 } from 'lucide-react';
+import { isRazorpayRuntimeAvailable } from '../../services/api';
 
 interface RazorpayButtonProps {
     amount: number;
@@ -10,6 +11,7 @@ interface RazorpayButtonProps {
     onSuccess?: () => void;
     buttonText?: string;
     className?: string;
+    disabledReason?: string;
 }
 
 export function RazorpayButton({
@@ -19,11 +21,18 @@ export function RazorpayButton({
     tenantId,
     onSuccess,
     buttonText = 'Pay Now',
-    className = ''
+    className = '',
+    disabledReason
 }: RazorpayButtonProps) {
     const [loading, setLoading] = useState(false);
+    const apiBaseUrl = (import.meta as any).env.VITE_API_BASE_URL?.replace(/\/$/, '') || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? window.location.origin : '');
+    const isAvailable = isRazorpayRuntimeAvailable() && Boolean((window as any).Razorpay);
 
     const handlePayment = async () => {
+        if (!isAvailable) {
+            alert(disabledReason || 'Razorpay is not configured for this deployment yet.');
+            return;
+        }
         setLoading(true);
         try {
             // 1. Create a placeholder record in Supabase to track this attempt
@@ -42,7 +51,7 @@ export function RazorpayButton({
             if (dbError) throw dbError;
 
             // 2. Create the Razorpay Order via our secure Express backend (Unified URL)
-            const orderResponse = await fetch('/api/create-order', {
+            const orderResponse = await fetch(`${apiBaseUrl}/api/create-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -75,7 +84,7 @@ export function RazorpayButton({
                 handler: async (response: any) => {
                     try {
                         // 4. Verify the payment signature on our secure backend
-                        const verifyResponse = await fetch('/api/verify-payment', {
+                        const verifyResponse = await fetch(`${apiBaseUrl}/api/verify-payment`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -150,11 +159,12 @@ export function RazorpayButton({
     return (
         <button
             onClick={handlePayment}
-            disabled={loading}
+            disabled={loading || !isAvailable}
+            title={!isAvailable ? (disabledReason || 'Razorpay is not configured for this deployment.') : undefined}
             className={`btn btn-primary inline-flex items-center gap-2 ${className} ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
         >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-            {loading ? 'Processing...' : buttonText}
+            {loading ? 'Processing...' : !isAvailable ? 'Razorpay Unavailable' : buttonText}
         </button>
     );
 }

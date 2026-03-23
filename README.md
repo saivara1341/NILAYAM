@@ -40,4 +40,11 @@ Optional GitHub secrets for production-like frontend config:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_RAZORPAY_KEY_ID`
+- `VITE_API_BASE_URL`
 - `VITE_GEMINI_API_KEY`
+
+Notes:
+
+- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` is not used by this app. Use `VITE_SUPABASE_ANON_KEY` instead.
+- Do not put your Razorpay secret in a `VITE_` variable. Keep the secret only on your backend server.
+- For manual payment proof upload, run the SQL in [supabase/add_payment_proofs_bucket.sql](supabase/add_payment_proofs_bucket.sql) in Supabase before using the feature.

@@ -11,9 +11,11 @@ import {
 import {
     acknowledgeTenantAgreement,
     addTenantCharge,
+    approveTenantPayment,
     createAnnouncement,
     getTenantDetailsWithPayments,
     markReminderAsSent,
+    rejectTenantPayment,
     scheduleTenantReminder,
     updateTenantLifecycle,
     updateTenantAgreement
@@ -25,7 +27,9 @@ import Spinner from '../components/ui/Spinner';
 
 const paymentStatusStyles: Record<Payment['status'], string> = {
     paid: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    pending: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
     due: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+    failed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
 };
 
 const chargeStatusStyles: Record<ChargeLedgerEntry['status'], string> = {
@@ -81,7 +85,7 @@ const PaymentHistory: React.FC<{ payments: Payment[] }> = ({ payments }) => (
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{payment.paid_date ? new Date(payment.paid_date).toLocaleDateString() : 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">₹{payment.amount.toLocaleString('en-IN')}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${paymentStatusStyles[payment.status]}`}>{payment.status.toUpperCase()}</span>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${paymentStatusStyles[payment.status]}`}>{payment.status.replace('_', ' ').toUpperCase()}</span>
                         </td>
                     </tr>
                 ))}
@@ -253,6 +257,27 @@ const TenantDetailPage: React.FC = () => {
             setTenant((current) => current ? { ...current, operations: { ...current.operations!, agreement: next } } : current);
         } catch (err: any) {
             setError(err.message || 'Failed to update agreement workflow.');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handlePaymentDecision = async (paymentId: string, action: 'approve' | 'reject') => {
+        if (!tenantId) return;
+        setIsSending(true);
+        setError(null);
+        try {
+            if (action === 'approve') {
+                await approveTenantPayment(paymentId);
+            } else {
+                await rejectTenantPayment(paymentId);
+            }
+
+            const refreshed = await getTenantDetailsWithPayments(tenantId);
+            setTenant(refreshed);
+            setAgreementDraft(refreshed.operations?.agreement || null);
+        } catch (err: any) {
+            setError(err.message || 'Failed to update payment verification status.');
         } finally {
             setIsSending(false);
         }
@@ -471,6 +496,42 @@ const TenantDetailPage: React.FC = () => {
                     <Card>
                         <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Payment History</h3>
                         {tenant.payments.length > 0 ? <PaymentHistory payments={tenant.payments} /> : <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">No payment history found for this tenant.</p>}
+                    </Card>
+
+                    <Card>
+                        <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Manual Payment Verification</h3>
+                        {tenant.payments.filter((payment) => payment.payment_mode === 'manual' && payment.proof_url).length > 0 ? (
+                            <div className="space-y-4">
+                                {tenant.payments.filter((payment) => payment.payment_mode === 'manual' && payment.proof_url).map((payment) => (
+                                    <div key={payment.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                            <div>
+                                                <p className="text-sm font-bold text-neutral-900 dark:text-white">₹{payment.amount.toLocaleString('en-IN')} for {payment.payment_type?.replace(/_/g, ' ') || 'payment'}</p>
+                                                <p className="text-xs text-neutral-500 dark:text-neutral-400">Submitted {payment.created_at ? new Date(payment.created_at).toLocaleString() : 'recently'}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${paymentStatusStyles[payment.status]}`}>{payment.status.toUpperCase()}</span>
+                                        </div>
+                                        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+                                            <a href={payment.proof_url} target="_blank" rel="noreferrer" className="rounded-xl border border-neutral-300 dark:border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-900 dark:text-white">
+                                                View Payment Proof
+                                            </a>
+                                            {payment.status !== 'paid' && (
+                                                <>
+                                                    <button onClick={() => handlePaymentDecision(payment.id, 'approve')} disabled={isSending} className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-60">
+                                                        Approve Credit Received
+                                                    </button>
+                                                    <button onClick={() => handlePaymentDecision(payment.id, 'reject')} disabled={isSending} className="rounded-xl border border-amber-300 dark:border-amber-700 px-4 py-2 text-sm font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/10 disabled:opacity-60">
+                                                        Reject / Retry
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">No manual payment proofs have been submitted yet.</p>
+                        )}
                     </Card>
                 </div>
             </div>

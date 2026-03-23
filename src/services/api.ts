@@ -28,6 +28,7 @@ const currentMonthBounds = () => {
 const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_');
 const normalizePhoneNumber = (value?: string | null) => (value || '').replace(/\D/g, '').slice(-10);
 const normalizeAadhaarNumber = (value?: string | null) => (value || '').replace(/\D/g, '').slice(0, 12);
+const paymentProofsBucket = 'payment-proofs';
 const getE2EState = () => {
     if (typeof window === 'undefined') return null;
     return (window as any).__NILAYAM_E2E__ || null;
@@ -114,6 +115,41 @@ const getTenantIdentityRegistry = (): Record<string, { aadhaar_number: string; t
 const setTenantIdentityRegistry = (value: Record<string, { aadhaar_number: string; tenant_score: number; name?: string | null; phone?: string | null }>) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(tenantIdentityRegistryKey, JSON.stringify(value));
+};
+
+const getApiBaseUrl = () => {
+    const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+    if (configured) {
+        return configured.replace(/\/$/, '');
+    }
+
+    if (typeof window !== 'undefined') {
+        const { origin, hostname } = window.location;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return origin;
+        }
+    }
+
+    return '';
+};
+
+export const isRazorpayRuntimeAvailable = () => Boolean(import.meta.env.VITE_RAZORPAY_KEY_ID && getApiBaseUrl());
+export const canUseRazorpayForOwner = (methods?: PaymentMethods | null) => Boolean(methods?.enableRazorpay && isRazorpayRuntimeAvailable());
+
+const resolveReceiptUrl = async (receiptUrl?: string | null): Promise<string | undefined> => {
+    if (!receiptUrl) return undefined;
+    if (/^https?:\/\//i.test(receiptUrl)) return receiptUrl;
+
+    const { data, error } = await supabase.storage
+        .from(paymentProofsBucket)
+        .createSignedUrl(receiptUrl, 60 * 60 * 24 * 7);
+
+    if (error) {
+        console.warn('API: Unable to create signed payment proof URL.', error);
+        return undefined;
+    }
+
+    return data?.signedUrl;
 };
 
 const getAllStoredOperationEntries = () => {
@@ -970,19 +1006,31 @@ export const getTenantDetailsWithPayments = async (tenantId: string): Promise<an
 
     const { data: paymentRows, error: paymentsError } = await supabase
         .from('payments')
-        .select('id, due_date, paid_date, amount, status')
+        .select('id, payment_type, created_at, due_date, paid_date, amount, status, receipt_url, razorpay_payment_id')
         .eq('house_id', tenantId)
         .order('due_date', { ascending: false });
 
     if (paymentsError) throw paymentsError;
 
-    const payments = (paymentRows || []).map((payment: any) => ({
+    const payments = await Promise.all((paymentRows || []).map(async (payment: any) => ({
         id: payment.id,
+        payment_type: payment.payment_type,
+        created_at: payment.created_at,
         due_date: payment.due_date,
         paid_date: payment.paid_date || undefined,
         amount: Number(payment.amount || 0),
-        status: payment.status === 'completed' ? 'paid' : 'due'
-    }));
+        status:
+            payment.status === 'completed'
+                ? 'paid'
+                : payment.status === 'pending'
+                    ? 'pending'
+                    : payment.status === 'failed'
+                        ? 'failed'
+                        : 'due',
+        proof_url: await resolveReceiptUrl(payment.receipt_url),
+        payment_mode: payment.razorpay_payment_id ? 'razorpay' : payment.receipt_url ? 'manual' : undefined,
+        razorpay_payment_id: payment.razorpay_payment_id || undefined
+    })));
 
     const operations = getTenantOperationalData(data, paymentRows || []);
 
@@ -1106,7 +1154,72 @@ export const markPaymentAsPaid = async (paymentId: string): Promise<void> => {
             paid_date: new Date().toISOString().slice(0, 10)
         })
         .eq('id', paymentId)
-        .in('status', ['pending', 'due']);
+        .in('status', ['pending', 'due', 'failed']);
+
+    if (error) throw error;
+};
+
+export const submitManualPaymentProof = async (payload: {
+    paymentId?: string;
+    tenantId: string;
+    houseId: string;
+    amount: number;
+    paymentType: 'rent' | 'maintenance' | 'security_deposit' | 'subscription';
+    proofFile: File;
+}): Promise<void> => {
+    const filePath = `${payload.tenantId}/${Date.now()}-${sanitizeFileName(payload.proofFile.name)}`;
+    const { error: uploadError } = await supabase.storage
+        .from(paymentProofsBucket)
+        .upload(filePath, payload.proofFile, { upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const updatePayload = {
+        tenant_id: payload.tenantId,
+        house_id: payload.houseId,
+        amount: payload.amount,
+        payment_type: payload.paymentType,
+        status: 'pending',
+        receipt_url: filePath,
+        paid_date: null
+    };
+
+    if (payload.paymentId) {
+        const { error } = await supabase
+            .from('payments')
+            .update(updatePayload)
+            .eq('id', payload.paymentId);
+        if (error) throw error;
+        return;
+    }
+
+    const { error } = await supabase
+        .from('payments')
+        .insert(updatePayload);
+
+    if (error) throw error;
+};
+
+export const approveTenantPayment = async (paymentId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('payments')
+        .update({
+            status: 'completed',
+            paid_date: new Date().toISOString().slice(0, 10)
+        })
+        .eq('id', paymentId);
+
+    if (error) throw error;
+};
+
+export const rejectTenantPayment = async (paymentId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('payments')
+        .update({
+            status: 'failed',
+            paid_date: null
+        })
+        .eq('id', paymentId);
 
     if (error) throw error;
 };
@@ -1646,7 +1759,7 @@ export const getTenantDashboardData = async (): Promise<TenantDashboardData | nu
             .maybeSingle(),
         supabase
             .from('payments')
-            .select('id, amount, due_date, status, created_at')
+            .select('id, amount, due_date, status, created_at, receipt_url, razorpay_payment_id')
             .eq('tenant_id', user.id)
             .eq('house_id', houseData.id)
             .eq('payment_type', 'rent')
@@ -1671,7 +1784,7 @@ export const getTenantDashboardData = async (): Promise<TenantDashboardData | nu
     if (ownerError && ownerError.code !== 'PGRST116') throw ownerError;
 
     const completedPayment = (existingPayments || []).find((payment: any) => payment.status === 'completed');
-    const duePayment = (existingPayments || []).find((payment: any) => payment.status === 'pending' || payment.status === 'due');
+    const duePayment = (existingPayments || []).find((payment: any) => ['pending', 'due', 'failed'].includes(payment.status));
     let nextPayment: TenantDashboardData['nextPayment'] = null;
 
     if (!completedPayment) {
@@ -1685,6 +1798,9 @@ export const getTenantDashboardData = async (): Promise<TenantDashboardData | nu
             id: duePayment.id,
             due_date: duePayment.due_date ? new Date(duePayment.due_date).toISOString() : nextDueDate.toISOString(),
             amount: Number(duePayment.amount || houseData.rent_amount),
+            status: duePayment.status === 'completed' ? 'paid' : duePayment.status === 'failed' ? 'failed' : duePayment.status === 'pending' ? 'pending' : 'due',
+            payment_mode: duePayment.razorpay_payment_id ? 'razorpay' : duePayment.receipt_url ? 'manual' : undefined,
+            proof_url: await resolveReceiptUrl(duePayment.receipt_url)
         } : {
             id: `rent_due_${houseData.id}_${start.toISOString().slice(0, 7)}`,
             due_date: nextDueDate.toISOString(),

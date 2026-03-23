@@ -12,6 +12,7 @@ import { UserRole, PaymentMethods, BankDetails } from '../types';
 import { ZapIcon, QrCodeIcon, BankIcon, CloudUploadIcon, PencilIcon } from '../constants';
 import { RazorpayButton } from '../components/payments/RazorpayButton';
 import { ProfileLoadingIllustration } from '../components/ui/StateIllustrations';
+import { canUseRazorpayForOwner } from '../services/api';
 
 const ProfilePage: React.FC = () => {
     const { profile, user, loading: authLoading, updateProfileState, signOut } = useAuth();
@@ -29,7 +30,10 @@ const ProfilePage: React.FC = () => {
 
     // Payment Settings State
     const [upiId, setUpiId] = useState(profile?.payment_methods?.upiId || '');
+    const [enableRazorpay, setEnableRazorpay] = useState(Boolean(profile?.payment_methods?.enableRazorpay));
+    const [mobileNumber, setMobileNumber] = useState(profile?.payment_methods?.mobileNumber || '');
     const [qrCodeUrl, setQrCodeUrl] = useState(profile?.payment_methods?.qrCodeUrl || '');
+    const [paymentInstructions, setPaymentInstructions] = useState(profile?.payment_methods?.paymentInstructions || '');
     const [bankDetails, setBankDetails] = useState<BankDetails>(profile?.payment_methods?.bankDetails || {
         accountHolder: '', accountNumber: '', ifsc: '', bankName: ''
     });
@@ -46,8 +50,11 @@ const ProfilePage: React.FC = () => {
         setAadhaarNumber(profile?.aadhaar_number || '');
         setBio(profile?.bio || '');
         setAvatarUrl(profile?.avatar_url || '');
+        setEnableRazorpay(Boolean(profile?.payment_methods?.enableRazorpay));
         setUpiId(profile?.payment_methods?.upiId || '');
+        setMobileNumber(profile?.payment_methods?.mobileNumber || '');
         setQrCodeUrl(profile?.payment_methods?.qrCodeUrl || '');
+        setPaymentInstructions(profile?.payment_methods?.paymentInstructions || '');
         setBankDetails(profile?.payment_methods?.bankDetails || {
             accountHolder: '', accountNumber: '', ifsc: '', bankName: ''
         });
@@ -129,8 +136,11 @@ const ProfilePage: React.FC = () => {
         setSuccess(null);
         try {
             const methods: PaymentMethods = {
+                enableRazorpay,
                 upiId: upiId.trim(),
+                mobileNumber: mobileNumber.trim(),
                 qrCodeUrl: qrCodeUrl.trim(),
+                paymentInstructions: paymentInstructions.trim(),
                 bankDetails: bankDetails
             };
             const updatedProfile = await updatePaymentMethods(methods);
@@ -380,10 +390,26 @@ const ProfilePage: React.FC = () => {
                         <form onSubmit={handlePaymentUpdate} className="space-y-6">
                             <div>
                                 <h3 className="text-lg font-semibold text-blue-900 dark:text-slate-300 mb-1">Payment Settings</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Configure how tenants can pay you. These details will be visible in their dashboard.</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Configure how tenants can pay you. You can enable Razorpay when a backend is connected, or use manual UPI, QR, bank transfer, and mobile verification.</p>
                             </div>
 
                             <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-6">
+                                <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50 dark:bg-indigo-900/10 p-4">
+                                    <label className="flex items-start gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={enableRazorpay}
+                                            onChange={(e) => setEnableRazorpay(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">Enable Razorpay checkout</p>
+                                            <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                                                Turn this on only when your frontend key and backend payment API are deployed. {canUseRazorpayForOwner(profile?.payment_methods) ? 'Razorpay is currently available in this runtime.' : 'Right now the app will fall back to manual payment collection.'}
+                                            </p>
+                                        </div>
+                                    </label>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
                                         <label htmlFor="upiId" className="block text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
@@ -395,6 +421,19 @@ const ProfilePage: React.FC = () => {
                                             value={upiId}
                                             onChange={(e) => setUpiId(e.target.value)}
                                             placeholder="username@upi"
+                                            className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="ownerMobilePayment" className="block text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            Mobile Number for Payment Confirmation
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            id="ownerMobilePayment"
+                                            value={mobileNumber}
+                                            onChange={(e) => setMobileNumber(e.target.value)}
+                                            placeholder="+91 9876543210"
                                             className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
                                         />
                                     </div>
@@ -424,6 +463,17 @@ const ProfilePage: React.FC = () => {
                                         <input type="text" placeholder="Account Number" value={bankDetails.accountNumber} onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })} className="block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200 text-sm" />
                                         <input type="text" placeholder="IFSC Code" value={bankDetails.ifsc} onChange={(e) => setBankDetails({ ...bankDetails, ifsc: e.target.value })} className="block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200 text-sm" />
                                     </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="paymentInstructions" className="block text-sm font-medium text-slate-600 dark:text-slate-400">Instructions for Tenants</label>
+                                    <textarea
+                                        id="paymentInstructions"
+                                        rows={3}
+                                        value={paymentInstructions}
+                                        onChange={(e) => setPaymentInstructions(e.target.value)}
+                                        placeholder="Example: Pay to the UPI above, then upload the screenshot. I will verify the amount in my account and approve it."
+                                        className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                    />
                                 </div>
                             </div>
 

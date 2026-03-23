@@ -37,6 +37,7 @@ jobs:
       - name: Build frontend
         env:
           GITHUB_ACTIONS: "true"
+          BASE_PATH: "/NILAYAM/"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.STAGING_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || secrets.STAGING_SUPABASE_ANON_KEY }}
           VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID || secrets.STAGING_RAZORPAY_KEY }}

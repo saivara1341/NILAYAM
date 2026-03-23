@@ -1,0 +1,58 @@
+# ============================================================
+# Nilayam Java/Spring-Boot Backend — Multi-Stage Dockerfile
+# Stage 1: Maven build using Eclipse Temurin JDK 22
+# Stage 2: Runtime using minimal JRE image
+# ============================================================
+
+# ── Stage 1: Build ──────────────────────────────────────────
+FROM eclipse-temurin:22-jdk-alpine AS builder
+
+WORKDIR /app
+
+# Copy Maven wrapper + POM first for layer caching
+COPY backend-java/pom.xml ./pom.xml
+
+# Download dependencies without building (cache layer)
+RUN apk add --no-cache maven && \
+    mvn dependency:go-offline -B --no-transfer-progress || true
+
+# Copy full source
+COPY backend-java/src ./src
+
+# Build the Spring Boot fat JAR (skip tests; tests run in CI)
+RUN mvn package -DskipTests -B --no-transfer-progress
+
+# ── Stage 2: Runtime ─────────────────────────────────────────
+FROM eclipse-temurin:22-jre-alpine AS production
+
+LABEL maintainer="devops@nilayam.in"
+LABEL service="nilayam-java-backend"
+LABEL version="1.0"
+
+WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -S nilayam && adduser -S nilayam -G nilayam
+
+# Copy built JAR from builder stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Fix permissions
+RUN chown nilayam:nilayam app.jar
+
+# JVM tuning for containers (respects cgroup memory limits)
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+               -XX:MaxRAMPercentage=75.0 \
+               -XX:InitialRAMPercentage=50.0 \
+               -Djava.security.egd=file:/dev/./urandom \
+               -Dspring.profiles.active=prod"
+
+EXPOSE 8080
+
+# Health check using Spring Boot Actuator
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+USER nilayam
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

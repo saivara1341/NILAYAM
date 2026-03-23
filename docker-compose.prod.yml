@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # ── Frontend (Production Build) ───────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      # In CI these would be passed dynamically
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID}
+    image: registry.gitlab.com/nilayam/frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # Nginx in production image exposes 80, but proxy maps 443 to it
+    networks:
+      - nilayam-prod-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Backend (Spring Boot Prod) ────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: production
+    image: registry.gitlab.com/nilayam/backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    networks:
+      - nilayam-prod-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # ── Nginx Proxy (TLS Terminator) ──────────────────────
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # SSL Certs (Managed by Certbot on host)
+      - /etc/letsencrypt/live/nilayam.in/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/nilayam.in/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
+      - /etc/letsencrypt/options-ssl-nginx.conf:/etc/nginx/options-ssl-nginx.conf:ro
+      - /etc/letsencrypt/ssl-dhparams.pem:/etc/nginx/ssl-dhparams.pem:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - nilayam-prod-net
+
+networks:
+  nilayam-prod-net:
+    driver: bridge

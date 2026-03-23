@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nilayam</string>
+    <string name="title_activity_main">Nilayam</string>
+    <string name="package_name">com.nilayam.app</string>
+    <string name="custom_url_scheme">com.nilayam.app</string>
+</resources>

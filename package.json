@@ -1,0 +1,47 @@
+{
+  "name": "nilayam-property-management",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "cap:sync": "npx cap sync",
+    "app:android": "npm run build && npx cap sync android",
+    "app:open:android": "npx cap open android",
+    "app:ios": "npm run build && npx cap sync ios",
+    "app:open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capgo/capacitor-updater": "^8.43.11",
+    "@google/genai": "^0.15.0",
+    "@google/generative-ai": "^0.24.1",
+    "@stitches/react": "^1.2.8",
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "lucide-react": "^0.577.0",
+    "razorpay": "^2.9.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-razorpay": "^3.0.1",
+    "react-router-dom": "6.22.3"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.2.0",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.19.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

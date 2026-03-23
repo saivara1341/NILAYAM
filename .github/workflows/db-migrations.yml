@@ -1,0 +1,38 @@
+name: Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: 'Environment to run migrations against'
+        options: 
+          - staging
+          - production
+        required: true
+      action:
+        type: choice
+        description: 'Migration action'
+        options:
+          - up
+          - down
+          - status
+        required: true
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Migrations Wrapper Script
+      run: |
+        chmod +x ./scripts/db-migrate.sh
+        
+        # In actual execution, URL / Password would be injected via GitHub Secrets mapped to environment
+        export SUPABASE_DB_URL=${{ secrets.SUPABASE_CONNECTION_STRING }}
+        export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        
+        ./scripts/db-migrate.sh ${{ github.event.inputs.action }}

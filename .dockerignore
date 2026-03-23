@@ -1,0 +1,49 @@
+# ── Node / Frontend ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-dist/
+.cache/
+
+# ── Build outputs ────────────────────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+
+# ── Java / Maven ─────────────────────────────────────────────
+backend-java/target/
+*.class
+*.jar
+*.war
+
+# ── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+
+# ── Test output ───────────────────────────────────────────────
+test-results/
+playwright-report/
+coverage/
+*.lcov
+
+# ── VCS & IDE ────────────────────────────────────────────────
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+*.suo
+*.sw?
+
+# ── Documentation ────────────────────────────────────────────
+docs/
+*.md
+!README.md
+
+# ── OS garbage ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

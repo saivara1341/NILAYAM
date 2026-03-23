@@ -1,0 +1,87 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels)
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ${{ env.FRONTEND_IMAGE }}
+          ${{ env.BACKEND_IMAGE }}
+        tags: |
+          type=sha,prefix=staging-
+          type=raw,value=staging
+
+    - name: Build and push Frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: production
+        push: true
+        tags: ${{ env.FRONTEND_IMAGE }}:staging-${{ github.sha }},${{ env.FRONTEND_IMAGE }}:staging
+        build-args: |
+          VITE_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          VITE_RAZORPAY_KEY_ID=${{ secrets.STAGING_RAZORPAY_KEY }}
+
+    - name: Build and push Backend
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.backend
+        target: production
+        push: true
+        tags: ${{ env.BACKEND_IMAGE }}:staging-${{ github.sha }},${{ env.BACKEND_IMAGE }}:staging
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+    - name: Deploy to Staging Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.STAGING_HOST }}
+        username: ${{ secrets.STAGING_USERNAME }}
+        key: ${{ secrets.STAGING_SSH_KEY }}
+        script: |
+          cd /opt/nilayam
+          # Export tag for compose
+          export IMAGE_TAG=staging-${{ github.sha }}
+          
+          # Pull exact images
+          docker pull ${{ env.FRONTEND_IMAGE }}:$IMAGE_TAG
+          docker pull ${{ env.BACKEND_IMAGE }}:$IMAGE_TAG
+          
+          # Restart services (zero-downtime relies on replica count > 1)
+          docker-compose -f docker-compose.prod.yml up -d --no-deps frontend backend
+
+          # Cleanup old images
+          docker image prune -f -a --filter "until=48h"

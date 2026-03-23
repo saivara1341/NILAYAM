@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="nilayamBg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB" />
+      <stop offset="1" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="384" height="384" rx="96" fill="url(#nilayamBg)" />
+  <path d="M166 234.667L256 164L346 234.667V345.333C346 357.115 336.449 366.667 324.667 366.667H187.333C175.551 366.667 166 357.115 166 345.333V234.667Z" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M226 366.667V276H286V366.667" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,70 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy (e.g. v1.2.0)'
+        required: true
+      sha:
+        description: 'Git SHA (usually staging-SHA) to promote'
+        required: true
+        
+env:
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+
+jobs:
+  promote-image:
+    runs-on: ubuntu-latest
+    environment: production # Requires manual approval in GH settings
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Promote Staging Images to Production
+      run: |
+        # Pull the tested staging image
+        docker pull ${{ env.FRONTEND_IMAGE }}:staging-${{ github.event.inputs.sha }}
+        docker pull ${{ env.BACKEND_IMAGE }}:staging-${{ github.event.inputs.sha }}
+        
+        # Tag for production
+        docker tag ${{ env.FRONTEND_IMAGE }}:staging-${{ github.event.inputs.sha }} ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}
+        docker tag ${{ env.FRONTEND_IMAGE }}:staging-${{ github.event.inputs.sha }} ${{ env.FRONTEND_IMAGE }}:latest
+        
+        docker tag ${{ env.BACKEND_IMAGE }}:staging-${{ github.event.inputs.sha }} ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+        docker tag ${{ env.BACKEND_IMAGE }}:staging-${{ github.event.inputs.sha }} ${{ env.BACKEND_IMAGE }}:latest
+        
+        # Push prod tags
+        docker push ${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.version }}
+        docker push ${{ env.FRONTEND_IMAGE }}:latest
+        docker push ${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.version }}
+        docker push ${{ env.BACKEND_IMAGE }}:latest
+
+  deploy-production:
+    needs: promote-image
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Trigger Production Server Update
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /opt/nilayam/prod
+          export IMAGE_TAG=${{ github.event.inputs.version }}
+          
+          # Execute safe zero-downtime deployment script
+          ./scripts/deploy.sh $IMAGE_TAG

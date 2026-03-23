@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # ── Frontend (Vite Dev Server) ─────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    # Override the image command to run Vite in dev mode
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reloading
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+      # Prevent local node_modules from overwriting container's
+      - /app/node_modules
+    env_file:
+      - .env.local
+    networks:
+      - nilayam-net
+
+  # ── Backend (Spring Boot Dev) ──────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: builder
+    # Run Spring Boot in development mode using Maven
+    command: mvn spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+    working_dir: /app
+    ports:
+      - "8080:8080" # API
+      - "5005:5005" # Debugging port
+    volumes:
+      - ./backend-java:/app/backend-java
+      - ./backend-java/pom.xml:/app/pom.xml
+      - /app/target
+      # Mount maven repo to cache dependencies across container restarts
+      - maven-repo:/root/.m2
+    env_file:
+      - .env.local
+    networks:
+      - nilayam-net
+
+  # ── Nginx Proxy (Dev Router) ───────────────────────────
+  proxy:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - nilayam-net
+
+networks:
+  nilayam-net:
+    driver: bridge
+
+volumes:
+  maven-repo:

@@ -8,9 +8,10 @@ interface SidebarProps {
     isCollapsed: boolean;
     isMobileOpen: boolean;
     setIsMobileOpen: (isOpen: boolean) => void;
+    isAppShell: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobileOpen, isAppShell }) => {
   const location = useLocation();
   const { t } = useLanguage();
 
@@ -19,7 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobil
         {/* Mobile Backdrop */}
         {isMobileOpen && (
             <div 
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-fade-in"
+                className={`fixed inset-0 z-40 animate-fade-in bg-black/60 backdrop-blur-sm ${isAppShell ? '' : 'md:hidden'}`}
                 onClick={() => setIsMobileOpen(false)}
             />
         )}
@@ -28,14 +29,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobil
         <aside className={`
             fixed inset-y-0 left-0 z-50 h-full bg-white dark:bg-neutral-900 border-r border-neutral-200/60 dark:border-neutral-800 
             transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
-            md:relative md:translate-x-0
+            ${isAppShell ? '' : 'md:relative md:translate-x-0'}
             ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-            ${isCollapsed ? 'md:w-20' : 'md:w-64'}
-            w-72 md:w-auto
+            ${isAppShell ? 'w-80 max-w-[88vw]' : `${isCollapsed ? 'md:w-20' : 'md:w-64'} w-72 md:w-auto`}
         `}>
           <div className="flex flex-col h-full">
               {/* Mobile Header in Drawer */}
-              <div className="md:hidden flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-800">
+              <div className={`flex items-center justify-between border-b border-neutral-100 p-4 dark:border-neutral-800 ${isAppShell ? '' : 'md:hidden'}`}>
                   <span className="font-bold text-lg text-neutral-800 dark:text-neutral-200">Menu</span>
                   <button onClick={() => setIsMobileOpen(false)} className="p-2 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobil
                                 </span>
                                 
                                 {/* Label: Hidden if collapsed on Desktop, always shown on Mobile */}
-                                <span className={`truncate ${isCollapsed ? 'md:hidden' : 'block'}`}>
+                                <span className={`truncate ${!isAppShell && isCollapsed ? 'md:hidden' : 'block'}`}>
                                     {t(link.labelKey)}
                                 </span>
                                 

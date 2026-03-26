@@ -1,6 +1,7 @@
 /**
  * Utility for sharing property details and location
  */
+import { isAppShell } from './platform';
 
 interface ShareLocationOptions {
     name: string;
@@ -14,6 +15,50 @@ interface ShareListingOptions {
     text: string;
     url?: string;
 }
+
+export type SocialShareTarget = 'whatsapp' | 'telegram' | 'facebook' | 'x' | 'linkedin';
+
+const getFallbackShareUrl = () => {
+    if (typeof window === 'undefined') return '';
+    return window.location.href;
+};
+
+export const buildAbsoluteShareUrl = (path: string) => {
+    if (typeof window === 'undefined') return path;
+    const configuredOrigin = (import.meta as any).env?.VITE_PUBLIC_APP_URL?.trim?.();
+    const origin = configuredOrigin ? configuredOrigin.replace(/\/$/, '') : window.location.origin;
+    return `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
+export const getSocialShareLinks = (options: ShareListingOptions): Record<SocialShareTarget, string> => {
+    const url = options.url || getFallbackShareUrl();
+    const text = [options.title, options.text].filter(Boolean).join('\n');
+    const encodedUrl = encodeURIComponent(url);
+    const encodedText = encodeURIComponent(text);
+    const encodedTitle = encodeURIComponent(options.title);
+
+    return {
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`,
+        telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+        x: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}&title=${encodedTitle}`,
+    };
+};
+
+export const openSocialShare = (target: SocialShareTarget, options: ShareListingOptions) => {
+    const links = getSocialShareLinks(options);
+    const url = links[target];
+    if (!url) return false;
+
+    if (isAppShell()) {
+        window.location.href = url;
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    return true;
+};
 
 /**
  * Shares a property's location using the Web Share API if available, 
@@ -80,7 +125,12 @@ export const openWhatsAppChat = (phone?: string | null, message?: string) => {
     const dialNumber = toIndianDialNumber(phone);
     if (!dialNumber) return false;
     const suffix = message ? `?text=${encodeURIComponent(message)}` : '';
-    window.open(`https://wa.me/${dialNumber}${suffix}`, '_blank');
+    const url = `https://wa.me/${dialNumber}${suffix}`;
+    if (isAppShell()) {
+        window.location.href = url;
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
     return true;
 };
 
@@ -88,6 +138,36 @@ export const openPhoneDialer = (phone?: string | null) => {
     const dialNumber = extractPhoneNumber(phone) || (phone || '').replace(/\D/g, '');
     if (!dialNumber) return false;
     window.location.href = `tel:${dialNumber}`;
+    return true;
+};
+
+export const openExternalIntent = (primaryUrl?: string | null, fallbackUrl?: string | null) => {
+    if (!primaryUrl || typeof window === 'undefined') return false;
+
+    if (isAppShell()) {
+        window.location.href = primaryUrl;
+    } else {
+        const anchor = document.createElement('a');
+        anchor.href = primaryUrl;
+        anchor.rel = 'noopener noreferrer';
+        anchor.click();
+    }
+
+    if (fallbackUrl && fallbackUrl !== primaryUrl) {
+        window.setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                if (isAppShell()) {
+                    window.location.href = fallbackUrl;
+                } else {
+                    const fallback = document.createElement('a');
+                    fallback.href = fallbackUrl;
+                    fallback.rel = 'noopener noreferrer';
+                    fallback.click();
+                }
+            }
+        }, 700);
+    }
+
     return true;
 };
 

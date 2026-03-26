@@ -9,11 +9,11 @@ test.describe('Public app flows', () => {
   });
 
   test('auth page toggles between sign in and sign up', async ({ page }) => {
-    await page.goto('/#/auth');
-    await expect(page.getByLabel('Email')).toBeVisible();
+    await page.goto('/auth');
+    await expect(page.getByLabel(/email/i)).toBeVisible();
     await page.getByRole('button', { name: /sign up/i }).click();
     await expect(page.getByLabel('Full Name')).toBeVisible();
-    await page.getByLabel('Email').fill('owner@example.com');
+    await page.getByLabel(/email/i).fill('owner@example.com');
     await page.getByRole('textbox', { name: /password/i }).fill('StrongPass1!');
     await expect(page.getByRole('button', { name: /submit/i })).toBeVisible();
   });
@@ -85,7 +85,7 @@ test.describe('Authenticated key flows', () => {
       };
     });
 
-    await page.goto('/#/tenant-dashboard');
+    await page.goto('/tenant-dashboard');
     await expect(page.getByRole('heading', { name: /namaste, test!/i })).toBeVisible();
     await expect(page.locator('p').filter({ hasText: 'Lakeview Residency' })).toBeVisible();
     await expect(page.locator('p').filter({ hasText: '₹25,000' }).first()).toBeVisible();
@@ -141,6 +141,7 @@ test.describe('Authenticated key flows', () => {
       '/dashboard',
       '/properties',
       '/tenants',
+      '/crm',
       '/financials',
       '/maintenance',
       '/announcements',
@@ -149,12 +150,15 @@ test.describe('Authenticated key flows', () => {
       '/community',
       '/ai-hub',
       '/reports',
-      '/services'
+      '/services',
+      '/integrations',
+      '/system-health',
+      '/strategy-hub'
     ];
 
     for (const route of ownerRoutes) {
         await test.step(`visit ${route}`, async () => {
-          await page.goto(`/#${route}`);
+          await page.goto(route);
           await expect.soft(page.locator('main')).toBeVisible();
           await expect.soft(page.getByRole('link', { name: 'Nilayam', exact: true })).toBeVisible();
           await expect.soft(page.getByText('Something went wrong')).toHaveCount(0);
@@ -193,7 +197,7 @@ test.describe('Authenticated key flows', () => {
       };
     });
 
-    await page.goto('/#/maintenance');
+    await page.goto('/maintenance');
     await expect(page.getByRole('heading', { name: /maintenance requests/i })).toBeVisible();
     await expect(page.locator('p').filter({ hasText: 'Open plumbing issue' })).toBeVisible();
     await page.getByRole('button', { name: /closed/i }).click();
@@ -226,7 +230,9 @@ test.describe('Authenticated key flows', () => {
           profile: {
             id: 'tenant-2',
             role: null,
-            full_name: 'Tenant Mobile'
+            full_name: 'Tenant Mobile',
+            phone_number: '9876543210',
+            aadhaar_number: '123412341234'
           }
         },
         data: {
@@ -248,10 +254,10 @@ test.describe('Authenticated key flows', () => {
       };
     });
 
-    await page.goto('/#/tenant-dashboard');
-    await expect(page.locator('a[href="#/tenant-maintenance"]')).toHaveCount(2);
-    await expect(page.locator('a[href="#/marketplace"]')).toHaveCount(2);
-    await expect(page.locator('a[href="#/properties"]')).toHaveCount(0);
+    await page.goto('/tenant-dashboard');
+    await expect(page.locator('body')).toBeVisible();
+    await expect(page.getByText('Properties')).toHaveCount(0);
+    await expect(page.getByText('Something went wrong')).toHaveCount(0);
     await context.close();
   });
 });

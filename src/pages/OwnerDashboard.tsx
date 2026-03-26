@@ -188,7 +188,7 @@ const OwnerDashboard: React.FC = () => {
     if (loading && !summary) return <DashboardSkeleton />;
 
     return (
-        <div className="space-y-10 animate-fade-in pb-safe pt-2">
+        <div className="space-y-8 animate-fade-in pb-safe pt-2 xl:space-y-10">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
                 <div>
                     <h2 className="text-2xl md:text-4xl font-black text-neutral-900 dark:text-white tracking-tight leading-tight">{t('dashboard.title')}</h2>
@@ -209,7 +209,7 @@ const OwnerDashboard: React.FC = () => {
             {summary && <SetupGuide summary={summary} />}
 
             {/* Quick Actions Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5 xl:gap-6">
                 <QuickActionBtn
                     to="/community"
                     icon={<ShieldCheckIcon />}
@@ -248,7 +248,7 @@ const OwnerDashboard: React.FC = () => {
                 />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.8fr)] xl:gap-10">
                 <div className="lg:col-span-2 space-y-12">
                     <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '500ms' }}>
                         <TodaysFocus />

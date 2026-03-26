@@ -1,0 +1,29 @@
+[functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.payment-authority]
+verify_jwt = false
+
+[functions.route-onboarding]
+verify_jwt = false
+
+[functions.payout-settlement]
+verify_jwt = false
+
+[functions.notification-dispatch]
+verify_jwt = false
+
+[functions.document-signing]
+verify_jwt = false
+
+[functions.ops-alerting]
+verify_jwt = false
+
+[functions.ops-dispatcher]
+verify_jwt = false
+
+[functions.billing-automation]
+verify_jwt = false
+
+[functions.public-marketplace]
+verify_jwt = false

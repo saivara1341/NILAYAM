@@ -21,7 +21,8 @@ import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../contexts/AuthContext';
 import { createProductMarketplaceListing, getMarketplaceListings, getProductMarketplaceListings } from '../services/api';
 import { Listing, ListingType, ProductCondition, ProductListing } from '../types';
-import { copyText, openPhoneDialer, openWhatsAppChat, shareListingDetails } from '../utils/sharing';
+import { buildAbsoluteShareUrl, copyText, openPhoneDialer, openSocialShare, openWhatsAppChat, shareListingDetails } from '../utils/sharing';
+import { getShellPlatform } from '@/utils/platform';
 
 type MarketplaceFilter = 'all' | 'rent' | 'sale' | 'products';
 
@@ -48,6 +49,40 @@ const getListingLabel = (type: ListingType) => (type === 'rent' ? 'For Rent' : '
 
 const getPropertyImage = (listing: Listing) => listing.images?.[0] || listing.image_url || '';
 
+const SocialShareStrip: React.FC<{
+    shareOptions: {
+        title: string;
+        text: string;
+        url?: string;
+    };
+}> = ({ shareOptions }) => {
+    const socialItems: Array<{ id: 'whatsapp' | 'telegram' | 'facebook' | 'x' | 'linkedin'; label: string; className: string }> = [
+        { id: 'whatsapp', label: 'WhatsApp', className: 'bg-emerald-500 text-white hover:bg-emerald-600' },
+        { id: 'telegram', label: 'Telegram', className: 'bg-sky-500 text-white hover:bg-sky-600' },
+        { id: 'facebook', label: 'Facebook', className: 'bg-blue-600 text-white hover:bg-blue-700' },
+        { id: 'x', label: 'X', className: 'bg-slate-900 text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900' },
+        { id: 'linkedin', label: 'LinkedIn', className: 'bg-indigo-600 text-white hover:bg-indigo-700' },
+    ];
+
+    return (
+        <div className="space-y-3">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Share to more channels</p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {socialItems.map((item) => (
+                    <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => openSocialShare(item.id, shareOptions)}
+                        className={`rounded-2xl px-4 py-3 text-sm font-bold transition ${item.className}`}
+                    >
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const PropertyDetailsModal: React.FC<{
     listing: Listing | null;
     onClose: () => void;
@@ -55,16 +90,17 @@ const PropertyDetailsModal: React.FC<{
     if (!listing) return null;
 
     const image = getPropertyImage(listing);
+    const shareOptions = {
+        title: `${listing.building_name} • ${getListingLabel(listing.listing_type)}`,
+        text: [
+            `${listing.address}`,
+            `${currency.format(listing.price)}${listing.listing_type === 'rent' ? ' / month' : ''}`,
+            listing.description,
+        ].filter(Boolean).join('\n'),
+        url: buildAbsoluteShareUrl(`/marketplace/properties/${listing.id}`),
+    };
     const shareProperty = async () => {
-        await shareListingDetails({
-            title: `${listing.building_name} • ${getListingLabel(listing.listing_type)}`,
-            text: [
-                `${listing.address}`,
-                `${currency.format(listing.price)}${listing.listing_type === 'rent' ? ' / month' : ''}`,
-                listing.description,
-            ].filter(Boolean).join('\n'),
-            url: listing.google_map_url,
-        });
+        await shareListingDetails(shareOptions);
     };
 
     return (
@@ -122,6 +158,8 @@ const PropertyDetailsModal: React.FC<{
                     </button>
                 </div>
 
+                <SocialShareStrip shareOptions={shareOptions} />
+
                 {listing.google_map_url ? (
                     <a
                         href={listing.google_map_url}
@@ -143,17 +181,19 @@ const ProductDetailsModal: React.FC<{
 }> = ({ product, onClose }) => {
     if (!product) return null;
 
+    const shareOptions = {
+        title: product.title,
+        text: [
+            `${currency.format(product.price)}`,
+            product.category,
+            conditionLabels[product.condition],
+            product.description,
+            product.location,
+        ].filter(Boolean).join('\n'),
+        url: buildAbsoluteShareUrl(`/marketplace/products/${product.id}`),
+    };
     const shareProduct = async () => {
-        await shareListingDetails({
-            title: product.title,
-            text: [
-                `${currency.format(product.price)}`,
-                product.category,
-                conditionLabels[product.condition],
-                product.description,
-                product.location,
-            ].filter(Boolean).join('\n'),
-        });
+        await shareListingDetails(shareOptions);
     };
 
     return (
@@ -204,6 +244,8 @@ const ProductDetailsModal: React.FC<{
                         Share Product
                     </button>
                 </div>
+
+                <SocialShareStrip shareOptions={shareOptions} />
             </div>
         </Modal>
     );
@@ -233,6 +275,8 @@ const MarketplacePage: React.FC = () => {
         condition: 'used' as ProductCondition,
         imageUrls: '',
     });
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const loadMarketplace = async () => {
         setLoading(true);
@@ -331,10 +375,24 @@ const MarketplacePage: React.FC = () => {
     };
 
     const totalVisible = filteredProperties.length + filteredProducts.length;
+    const quickShareProperty = async (listing: Listing) => {
+        await shareListingDetails({
+            title: listing.building_name,
+            text: `${listing.address}\n${currency.format(listing.price)}`,
+            url: buildAbsoluteShareUrl(`/marketplace/properties/${listing.id}`),
+        });
+    };
+    const quickShareProduct = async (product: ProductListing) => {
+        await shareListingDetails({
+            title: product.title,
+            text: `${product.category}\n${currency.format(product.price)}`,
+            url: buildAbsoluteShareUrl(`/marketplace/products/${product.id}`),
+        });
+    };
 
     return (
-        <div className="space-y-6">
-            <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_45%,#fff7ed_100%)] p-6 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.95)_0%,rgba(15,23,42,1)_55%,rgba(120,53,15,0.55)_100%)] md:p-8">
+        <div className={`space-y-6 ${isAppShell ? 'pb-20 md:pb-0' : 'pb-6'}`}>
+            <section className={`overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_45%,#fff7ed_100%)] shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.95)_0%,rgba(15,23,42,1)_55%,rgba(120,53,15,0.55)_100%)] ${isAppShell ? 'p-5' : 'p-6 md:p-8'}`}>
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-3xl space-y-4">
                         <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-blue-700 dark:border-blue-500/30 dark:bg-slate-900/60 dark:text-blue-200">
@@ -369,7 +427,7 @@ const MarketplacePage: React.FC = () => {
             </section>
 
             <section className="space-y-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className={`flex flex-col gap-4 ${isAppShell ? '' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
                     <div className="flex flex-wrap gap-3">
                         {filterMeta.map(item => {
                             const isActive = item.id === activeFilter;
@@ -390,7 +448,7 @@ const MarketplacePage: React.FC = () => {
                         })}
                     </div>
 
-                    <div className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:max-w-md">
+                    <div className={`flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${isAppShell ? '' : 'lg:max-w-md'}`}>
                         <Search className="h-4 w-4 text-slate-400" />
                         <input
                             value={search}
@@ -419,7 +477,7 @@ const MarketplacePage: React.FC = () => {
             {loading ? (
                 <Spinner className="min-h-[320px]" />
             ) : (
-                <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                <section className={`grid gap-5 ${isAppShell ? 'grid-cols-1 md:grid-cols-2' : 'lg:grid-cols-2 xl:grid-cols-3'}`}>
                     {filteredProperties.map(listing => (
                         <Card key={`property-${listing.id}`} className="group rounded-[1.75rem] border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <div className="overflow-hidden rounded-t-[1.75rem]">
@@ -439,7 +497,7 @@ const MarketplacePage: React.FC = () => {
                                         </div>
                                         <h3 className="mt-3 text-lg font-black text-slate-900 dark:text-white">{listing.building_name}</h3>
                                     </div>
-                                    <button onClick={() => void shareListingDetails({ title: listing.building_name, text: `${listing.address}\n${currency.format(listing.price)}`, url: listing.google_map_url })} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
+                                    <button onClick={() => void quickShareProperty(listing)} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
                                         <Share2 className="h-4 w-4" />
                                     </button>
                                 </div>
@@ -459,9 +517,22 @@ const MarketplacePage: React.FC = () => {
                                         <div className="text-2xl font-black text-slate-900 dark:text-white">{currency.format(listing.price)}</div>
                                         {listing.listing_type === 'rent' ? <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Per Month</div> : null}
                                     </div>
-                                    <button onClick={() => setSelectedProperty(listing)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
-                                        View Details
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => openSocialShare('whatsapp', {
+                                                title: listing.building_name,
+                                                text: `${listing.address}\n${currency.format(listing.price)}`,
+                                                url: buildAbsoluteShareUrl(`/marketplace/properties/${listing.id}`),
+                                            })}
+                                            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                        >
+                                            Broadcast
+                                        </button>
+                                        <button onClick={() => setSelectedProperty(listing)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                                            View Details
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </Card>
@@ -486,7 +557,7 @@ const MarketplacePage: React.FC = () => {
                                         </div>
                                         <h3 className="mt-3 text-lg font-black text-slate-900 dark:text-white">{product.title}</h3>
                                     </div>
-                                    <button onClick={() => void shareListingDetails({ title: product.title, text: `${product.category}\n${currency.format(product.price)}` })} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
+                                    <button onClick={() => void quickShareProduct(product)} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
                                         <Share2 className="h-4 w-4" />
                                     </button>
                                 </div>
@@ -509,9 +580,22 @@ const MarketplacePage: React.FC = () => {
                                             by {product.seller_name}
                                         </div>
                                     </div>
-                                    <button onClick={() => setSelectedProduct(product)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
-                                        View Details
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => openSocialShare('whatsapp', {
+                                                title: product.title,
+                                                text: `${product.category}\n${currency.format(product.price)}`,
+                                                url: buildAbsoluteShareUrl(`/marketplace/products/${product.id}`),
+                                            })}
+                                            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-black text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                        >
+                                            Broadcast
+                                        </button>
+                                        <button onClick={() => setSelectedProduct(product)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                                            View Details
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </Card>

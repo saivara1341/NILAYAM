@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Tenant } from '../types';
 import AddTenantModal from '../components/tenants/AddTenantModal';
 import LeaseGeneratorModal from '../components/tenants/LeaseGeneratorModal';
+import Card from '../components/ui/Card';
 import { Link } from 'react-router-dom';
 import { getTenants } from '../services/api';
 import PaginationControls from '../components/ui/PaginationControls';
@@ -13,6 +14,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { EmptyPeopleIllustration } from '../components/ui/StateIllustrations';
 import { Check, Copy } from 'lucide-react';
 import { copyText, openPhoneDialer, openWhatsAppChat } from '../utils/sharing';
+import { getShellPlatform } from '@/utils/platform';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -207,6 +209,8 @@ const TenantsPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [leaseTenant, setLeaseTenant] = useState<Tenant | null>(null);
     const [isLeaseModalOpen, setIsLeaseModalOpen] = useState(false);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const fetchTenants = useCallback(async (page: number, search: string) => {
         setLoading(true);
@@ -256,24 +260,28 @@ const TenantsPage: React.FC = () => {
             <AddTenantModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleAddSuccess} />
             <LeaseGeneratorModal isOpen={isLeaseModalOpen} onClose={() => setIsLeaseModalOpen(false)} tenant={leaseTenant} />
 
-            <div className="space-y-6 animate-fade-in pb-20 md:pb-0">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className={`animate-fade-in ${isAppShell ? 'space-y-6 pb-20 md:pb-0' : 'space-y-8 pb-6'}`}>
+                <section className={`overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#eff6ff_100%)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] ${isAppShell ? 'p-5' : 'p-6 xl:p-8'}`}>
+                    <div className={`flex gap-6 ${isAppShell ? 'flex-col' : 'flex-col xl:flex-row xl:items-end xl:justify-between'}`}>
                     <div>
+                        <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-300">Resident operations</p>
                         <h2 className="text-3xl font-bold text-neutral-900 dark:text-white tracking-tight">{t('tenants.title')}</h2>
-                        <p className="text-neutral-500 dark:text-neutral-400">{t('tenants.subtitle')}</p>
+                        <p className="mt-2 max-w-3xl text-neutral-500 dark:text-neutral-400">{t('tenants.subtitle')}</p>
                     </div>
-                    <div className="flex gap-3 w-full sm:w-auto">
+                    <div className={`flex gap-3 ${isAppShell ? 'w-full' : 'w-full xl:w-auto'}`}>
                         <button
                             onClick={() => setIsModalOpen(true)}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-black rounded-xl hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all shadow-lg active:scale-95 border border-neutral-200 dark:border-neutral-800"
+                            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-neutral-900 px-6 py-3 text-sm font-black text-white shadow-lg transition-all hover:bg-neutral-800 active:scale-95 dark:border-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                         >
                             + {t('qa.add_tenant')}
                         </button>
                     </div>
                 </div>
+                </section>
 
-                <div className="bg-white dark:bg-neutral-900 p-2 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800">
-                    <div className="relative">
+                <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
+                    <div className={`grid gap-4 ${isAppShell ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.4fr)_auto]'}`}>
+                        <div className="relative">
                         <input
                             type="text"
                             placeholder={t('tenants.search_placeholder')}
@@ -283,14 +291,31 @@ const TenantsPage: React.FC = () => {
                         />
                         <SearchIcon className="absolute left-4 top-3.5 w-5 h-5 text-neutral-400" />
                     </div>
-                </div>
+                        {!isAppShell && (
+                            <div className="grid min-w-[280px] grid-cols-3 gap-3">
+                                <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-center dark:border-neutral-700 dark:bg-neutral-900">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Residents</p>
+                                    <p className="mt-2 text-2xl font-black text-neutral-900 dark:text-white">{totalTenants}</p>
+                                </div>
+                                <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-center dark:border-neutral-700 dark:bg-neutral-900">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Selected</p>
+                                    <p className="mt-2 text-2xl font-black text-neutral-900 dark:text-white">{selectedTenants.length}</p>
+                                </div>
+                                <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-center dark:border-neutral-700 dark:bg-neutral-900">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Search</p>
+                                    <p className="mt-2 text-sm font-black text-neutral-900 dark:text-white">{debouncedSearchTerm.trim() ? 'Filtered' : 'All live'}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </Card>
 
                 <div className="mt-4">
                     {loading ? <div className="flex justify-center py-12"><Spinner /></div> : tenants.length === 0 ? (
                         <EmptyTenantsState hasSearch={Boolean(debouncedSearchTerm.trim())} onAdd={() => setIsModalOpen(true)} />
                     ) : (
                         <>
-                            <div className="hidden md:block overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                            <div className="hidden md:block overflow-hidden rounded-[1.6rem] border border-neutral-200 dark:border-neutral-700 shadow-sm">
                                 <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-700">
                                     <thead className="bg-neutral-50 dark:bg-neutral-800/50">
                                         <tr>
@@ -315,7 +340,7 @@ const TenantsPage: React.FC = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="md:hidden space-y-4">
+                            <div className={`space-y-4 ${isAppShell ? 'md:space-y-4' : 'md:hidden'}`}>
                                 {tenants.map(tenant => <TenantCardMobile key={tenant.id} tenant={tenant} onDraftLease={openLeaseGenerator} />)}
                             </div>
                             <PaginationControls

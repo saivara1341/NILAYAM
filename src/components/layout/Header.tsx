@@ -63,9 +63,10 @@ interface HeaderProps {
     setIsCollapsed: (isCollapsed: boolean) => void;
     isMobileOpen: boolean;
     setIsMobileOpen: (isOpen: boolean) => void;
+    isAppShell: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
+const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen, isAppShell }) => {
   const { user, profile } = useAuth();
   const { language, t } = useLanguage();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -97,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
   };
 
   const toggleSidebar = () => {
-    if (window.innerWidth < 768) {
+    if (isAppShell || window.innerWidth < 768) {
       setIsMobileOpen(!isMobileOpen);
     } else {
       setIsCollapsed(!isCollapsed);
@@ -107,33 +108,41 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
   const isTranslated = language !== 'en';
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Workspace';
   const workspaceLabel = profile?.role === UserRole.Tenant ? 'Tenant workspace' : 'Owner workspace';
+  const showDesktopSearch = !isAppShell;
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md pt-safe border-b border-neutral-200/50 dark:border-neutral-800/50 transition-all duration-300 relative">
-      <div className="px-4 sm:px-6 py-4 flex items-center justify-between h-20 relative z-20">
+      <div className={`relative z-20 flex items-center justify-between ${isAppShell ? 'h-16 px-4 py-3' : 'h-20 px-4 py-4 sm:px-6'}`}>
           
           {/* Top Left Menu Trigger + Brand */}
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
              <button 
                 onClick={toggleSidebar}
-                className="p-2.5 -ml-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 focus:outline-none active:scale-95 transition-all shadow-sm md:shadow-none bg-white dark:bg-neutral-800 md:bg-transparent"
+                className={`rounded-xl text-neutral-700 transition-all focus:outline-none active:scale-95 dark:text-neutral-200 ${isAppShell ? 'bg-white p-2 shadow-sm dark:bg-neutral-800' : 'bg-white p-2.5 shadow-sm md:bg-transparent md:shadow-none dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800'} -ml-2`}
                 aria-label="Toggle Menu"
             >
-                <Menu3ArrowsIcon className={`h-6 w-6 transition-transform duration-300 ${isCollapsed && window.innerWidth >= 768 ? 'rotate-180' : ''}`} />
+                <Menu3ArrowsIcon className={`h-6 w-6 transition-transform duration-300 ${!isAppShell && isCollapsed && window.innerWidth >= 768 ? 'rotate-180' : ''}`} />
             </button>
     
             <Link to="/" className="flex items-center gap-3 group">
-                <div className="bg-blue-600 text-white p-2 rounded-xl shadow-lg shadow-blue-600/20 group-hover:scale-105 transition-transform">
-                    <LogoIcon className="h-7 w-7" />
+                <div className={`rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition-transform group-hover:scale-105 ${isAppShell ? 'p-1.5' : 'p-2'}`}>
+                    <LogoIcon className={isAppShell ? 'h-6 w-6' : 'h-7 w-7'} />
                 </div>
-                <h1 className={`text-2xl md:text-3xl tracking-tighter text-neutral-900 dark:text-white ${isTranslated ? 'font-bold' : 'font-righteous'}`}>
+                <div className="min-w-0">
+                <h1 className={`tracking-tighter text-neutral-900 dark:text-white ${isAppShell ? 'text-xl' : 'text-2xl md:text-3xl'} ${isTranslated ? 'font-bold' : 'font-righteous'}`}>
                     {t('app.name')}
                 </h1>
+                {isAppShell && (
+                    <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">
+                        {workspaceLabel}
+                    </p>
+                )}
+                </div>
             </Link>
           </div>
           
           {/* Center Search - Hidden on mobile */}
-          <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 w-full max-w-xl justify-center">
+          <div className={`${showDesktopSearch ? 'hidden md:flex' : 'hidden'} absolute left-1/2 -translate-x-1/2 items-center gap-4 w-full max-w-xl justify-center`}>
                 <div className="relative group flex-1 max-w-md">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <SearchIcon className="h-4 w-4 text-neutral-400 group-focus-within:text-blue-500 transition-colors" />
@@ -147,7 +156,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <ActivityIndicator />
+            {!isAppShell && <ActivityIndicator />}
             
             {profile?.role === UserRole.Tenant && (
                 <Button 
@@ -206,7 +215,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
                 )}
             </div>
 
-            <Link to="/profile" className="hidden min-w-0 items-center gap-3 rounded-2xl border border-neutral-200/60 bg-white px-3 py-2 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60 dark:border-neutral-700/60 dark:bg-neutral-800/80 dark:hover:border-blue-900/40 dark:hover:bg-neutral-800 md:flex">
+            <Link to="/profile" className={`hidden min-w-0 items-center gap-3 rounded-2xl border border-neutral-200/60 bg-white px-3 py-2 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60 dark:border-neutral-700/60 dark:bg-neutral-800/80 dark:hover:border-blue-900/40 dark:hover:bg-neutral-800 ${isAppShell ? '' : 'lg:flex'}`}>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb,#0f172a)] text-xs font-black text-white">
                     {getInitials(displayName)}
                 </div>
@@ -216,7 +225,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
                 </div>
             </Link>
 
-            <Link to="/profile" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-neutral-200/50 bg-white text-xs font-black text-neutral-900 shadow-sm transition hover:border-blue-200 hover:text-blue-600 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-white md:hidden">
+            <Link to="/profile" className={`flex h-11 w-11 items-center justify-center rounded-2xl border border-neutral-200/50 bg-white text-xs font-black text-neutral-900 shadow-sm transition hover:border-blue-200 hover:text-blue-600 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-white ${isAppShell ? '' : 'lg:hidden'}`}>
                 {getInitials(displayName)}
             </Link>
 

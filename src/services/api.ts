@@ -1,6 +1,6 @@
 
 import { User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 import {
     Property, DashboardSummary, FinancialDataPoint, OccupancyDataPoint,
     Tenant, Transaction, MaintenanceRequest, Listing, Profile,
@@ -13,7 +13,8 @@ import {
     ChargeLedgerEntry, AgreementWorkflow, ReminderRecord, TenantOperationalData, TenantLifecycleData,
     Payment, OwnerPaymentsDashboard, OwnerPaymentFilters, OwnerPaymentPropertyOption, AgreementWorkspaceItem, CommunityEvent, ProductListing,
     TenantScoreSummary, TenantScoreFactor, TenantLogEntry, FinanceERPWorkspace, InvoiceRecord, ReconciliationRecord, OwnerPayoutRecord,
-    MaintenanceERPWorkspace, VendorWorkOrder, CRMWorkspace, LeadRecord, PropertyVisit, BookingRecord
+    MaintenanceERPWorkspace, VendorWorkOrder, CRMWorkspace, LeadRecord, PropertyVisit, BookingRecord,
+    EnterpriseOpsSnapshot, SystemHealthWorkspace, IntegrationStatus, AnalyticsWorkspace
 } from '../types';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -38,9 +39,56 @@ const productMarketplaceStorageKey = 'nilayam_product_marketplace';
 const financeWorkspaceStorageKey = 'nilayam_finance_workspace';
 const workOrdersStorageKey = 'nilayam_work_orders';
 const crmWorkspaceStorageKey = 'nilayam_crm_workspace';
+const enterpriseOpsStorageKey = 'nilayam_enterprise_ops_snapshot';
 const getE2EState = () => {
     if (typeof window === 'undefined') return null;
     return (window as any).__NILAYAM_E2E__ || null;
+};
+const allowLocalFallback = () => !isSupabaseConfigured || !!getE2EState();
+const shouldUseLocalErpPersistence = () => allowLocalFallback();
+const emptyEnterpriseOpsSnapshot = (): EnterpriseOpsSnapshot => ({
+    linkedAccountsPending: 0,
+    payoutRetriesQueued: 0,
+    webhookEventsPending: 0,
+    accountingExceptions: 0,
+    tenantLifecycleTasks: 0,
+    approvalTasks: 0,
+    marketplaceDisputes: 0,
+    notificationsQueued: 0,
+    documentsPendingReview: 0,
+    jobsFailing: 0,
+    analyticsSnapshots: 0,
+    securityIncidentsOpen: 0
+});
+const invokeEdgeFunction = async <T = any>(name: string, body: Record<string, any>): Promise<T | null> => {
+    try {
+        const { data, error } = await (supabase as any).functions.invoke(name, { body });
+        if (error) {
+            if (isSupabaseRelationUnavailable(error) || /FunctionsHttpError|Failed to send a request|non-2xx/i.test(String(error.message || ''))) {
+                return null;
+            }
+            throw error;
+        }
+        return (data ?? null) as T | null;
+    } catch (error: any) {
+        if (/FunctionsHttpError|Failed to fetch|Failed to send a request|network/i.test(String(error?.message || ''))) {
+            return null;
+        }
+        throw error;
+    }
+};
+const getStoredEnterpriseSnapshot = (): EnterpriseOpsSnapshot => {
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return emptyEnterpriseOpsSnapshot();
+    try {
+        const raw = localStorage.getItem(enterpriseOpsStorageKey);
+        return raw ? JSON.parse(raw) : emptyEnterpriseOpsSnapshot();
+    } catch {
+        return emptyEnterpriseOpsSnapshot();
+    }
+};
+const setStoredEnterpriseSnapshot = (value: EnterpriseOpsSnapshot) => {
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return;
+    localStorage.setItem(enterpriseOpsStorageKey, JSON.stringify(value));
 };
 const localOpsKey = (houseId: string) => `nilayam_ops_${houseId}`;
 const tenantIdentityRegistryKey = 'nilayam_tenant_identity_registry';
@@ -422,7 +470,7 @@ const setStoredFeedback = (entries: any[]) => {
 };
 
 const getStoredProductMarketplaceListings = (): ProductListing[] => {
-    if (typeof window === 'undefined') return [];
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return [];
     try {
         const raw = localStorage.getItem(productMarketplaceStorageKey);
         return raw ? JSON.parse(raw) : [];
@@ -432,12 +480,12 @@ const getStoredProductMarketplaceListings = (): ProductListing[] => {
 };
 
 const setStoredProductMarketplaceListings = (entries: ProductListing[]) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return;
     localStorage.setItem(productMarketplaceStorageKey, JSON.stringify(entries));
 };
 
 const getStoredFinanceWorkspace = (): FinanceERPWorkspace => {
-    if (typeof window === 'undefined') return { invoices: [], reconciliations: [], payouts: [] };
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return { invoices: [], reconciliations: [], payouts: [] };
     try {
         const raw = localStorage.getItem(financeWorkspaceStorageKey);
         return raw ? JSON.parse(raw) : { invoices: [], reconciliations: [], payouts: [] };
@@ -447,12 +495,12 @@ const getStoredFinanceWorkspace = (): FinanceERPWorkspace => {
 };
 
 const setStoredFinanceWorkspace = (workspace: FinanceERPWorkspace) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return;
     localStorage.setItem(financeWorkspaceStorageKey, JSON.stringify(workspace));
 };
 
 const getStoredWorkOrders = (): VendorWorkOrder[] => {
-    if (typeof window === 'undefined') return [];
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return [];
     try {
         const raw = localStorage.getItem(workOrdersStorageKey);
         return raw ? JSON.parse(raw) : [];
@@ -462,12 +510,12 @@ const getStoredWorkOrders = (): VendorWorkOrder[] => {
 };
 
 const setStoredWorkOrders = (entries: VendorWorkOrder[]) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return;
     localStorage.setItem(workOrdersStorageKey, JSON.stringify(entries));
 };
 
 const getStoredCRMWorkspace = (): CRMWorkspace => {
-    if (typeof window === 'undefined') return { leads: [], visits: [], bookings: [] };
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return { leads: [], visits: [], bookings: [] };
     try {
         const raw = localStorage.getItem(crmWorkspaceStorageKey);
         return raw ? JSON.parse(raw) : { leads: [], visits: [], bookings: [] };
@@ -477,7 +525,7 @@ const getStoredCRMWorkspace = (): CRMWorkspace => {
 };
 
 const setStoredCRMWorkspace = (workspace: CRMWorkspace) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldUseLocalErpPersistence()) return;
     localStorage.setItem(crmWorkspaceStorageKey, JSON.stringify(workspace));
 };
 
@@ -1697,6 +1745,12 @@ export const markReminderAsSent = async (houseId: string, reminderId: string): P
 };
 
 export const markPaymentAsPaid = async (paymentId: string): Promise<void> => {
+    const remote = await invokeEdgeFunction('payment-authority', {
+        action: 'mark_paid',
+        paymentId
+    });
+    if (remote) return;
+
     const { error } = await supabase
         .from('payments')
         .update({
@@ -1717,6 +1771,16 @@ export const submitManualPaymentProof = async (payload: {
     paymentType: 'rent' | 'maintenance' | 'security_deposit' | 'subscription';
     proofFile: File;
 }): Promise<void> => {
+    const remote = await invokeEdgeFunction('payment-authority', {
+        action: 'submit_manual_proof',
+        tenantId: payload.tenantId,
+        houseId: payload.houseId,
+        paymentId: payload.paymentId || null,
+        amount: payload.amount,
+        paymentType: payload.paymentType,
+        fileName: payload.proofFile.name
+    });
+
     const filePath = `${payload.tenantId}/${Date.now()}-${sanitizeFileName(payload.proofFile.name)}`;
     const { error: uploadError } = await supabase.storage
         .from(paymentProofsBucket)
@@ -1740,17 +1804,45 @@ export const submitManualPaymentProof = async (payload: {
             .update(updatePayload)
             .eq('id', payload.paymentId);
         if (error) throw error;
+        if (!remote) {
+            await supabase.from('approval_requests').insert({
+                owner_id: null,
+                request_type: 'manual_payment_review',
+                entity_table: 'payments',
+                entity_id: payload.paymentId,
+                submitted_by: payload.tenantId,
+                notes: 'Manual payment proof uploaded by tenant and awaiting owner review.'
+            }).then(() => undefined).catch(() => undefined);
+        }
         return;
     }
 
-    const { error } = await supabase
+    const { data: insertedPayment, error } = await supabase
         .from('payments')
-        .insert(updatePayload);
+        .insert(updatePayload)
+        .select('id')
+        .single();
 
     if (error) throw error;
+    if (!remote && insertedPayment?.id) {
+        await supabase.from('approval_requests').insert({
+            owner_id: null,
+            request_type: 'manual_payment_review',
+            entity_table: 'payments',
+            entity_id: insertedPayment.id,
+            submitted_by: payload.tenantId,
+            notes: 'Manual payment proof uploaded by tenant and awaiting owner review.'
+        }).then(() => undefined).catch(() => undefined);
+    }
 };
 
 export const approveTenantPayment = async (paymentId: string): Promise<void> => {
+    const remote = await invokeEdgeFunction('payment-authority', {
+        action: 'approve_payment',
+        paymentId
+    });
+    if (remote) return;
+
     const { error } = await supabase
         .from('payments')
         .update({
@@ -1763,6 +1855,12 @@ export const approveTenantPayment = async (paymentId: string): Promise<void> => 
 };
 
 export const rejectTenantPayment = async (paymentId: string): Promise<void> => {
+    const remote = await invokeEdgeFunction('payment-authority', {
+        action: 'reject_payment',
+        paymentId
+    });
+    if (remote) return;
+
     const { error } = await supabase
         .from('payments')
         .update({
@@ -1954,11 +2052,317 @@ export const getFinancialsOverview = async (): Promise<{ totalIncome: number, to
     };
 };
 
+export const getEnterpriseOpsSnapshot = async (): Promise<EnterpriseOpsSnapshot> => {
+    const fallback = getStoredEnterpriseSnapshot();
+
+    const counts = await Promise.all([
+        safeCount('owner_linked_accounts', { eq: { kyc_status: 'pending' } }),
+        safeCount('payout_retry_queue', { in: { status: ['queued', 'retrying'] } }),
+        safeCount('razorpay_webhook_events', { in: { processing_status: ['received', 'failed'] } }),
+        safeCount('accounting_adjustments', { eq: { approval_status: 'pending' } }),
+        safeCount('tenant_lifecycle_tasks', { in: { status: ['pending', 'in_progress'] } }),
+        safeCount('approval_requests', { eq: { status: 'pending' } }),
+        safeCount('marketplace_disputes', { in: { status: ['open', 'review'] } }),
+        safeCount('notification_queue', { in: { status: ['queued', 'retrying'] } }),
+        safeCount('document_verification_reviews', { eq: { status: 'pending' } }),
+        safeCount('job_runs', { in: { status: ['failed', 'retrying'] } }),
+        safeCount('analytics_snapshots'),
+        safeCount('security_incidents', { in: { status: ['open', 'monitoring'] } })
+    ]);
+
+    if (counts.every((value) => value === null)) {
+        if (!allowLocalFallback()) {
+            throw new Error('Enterprise ops tables are not available. Apply the Supabase enterprise migrations before opening admin workspaces.');
+        }
+        const finance = await getFinanceERPWorkspace();
+        const maintenance = await getMaintenanceERPWorkspace();
+        const crm = await getCRMWorkspace();
+
+        const derived: EnterpriseOpsSnapshot = {
+            linkedAccountsPending: fallback.linkedAccountsPending,
+            payoutRetriesQueued: finance.payouts.filter((payout) => payout.payout_status === 'failed' || payout.payout_status === 'processing').length,
+            webhookEventsPending: fallback.webhookEventsPending,
+            accountingExceptions: finance.reconciliations.filter((record) => record.status !== 'matched').length,
+            tenantLifecycleTasks: crm.leads.filter((lead) => lead.stage !== 'won' && lead.stage !== 'lost').length,
+            approvalTasks: fallback.approvalTasks,
+            marketplaceDisputes: fallback.marketplaceDisputes,
+            notificationsQueued: fallback.notificationsQueued,
+            documentsPendingReview: fallback.documentsPendingReview,
+            jobsFailing: fallback.jobsFailing,
+            analyticsSnapshots: fallback.analyticsSnapshots,
+            securityIncidentsOpen: fallback.securityIncidentsOpen
+        };
+        setStoredEnterpriseSnapshot(derived);
+        return derived;
+    }
+
+    const snapshot: EnterpriseOpsSnapshot = {
+        linkedAccountsPending: counts[0] ?? fallback.linkedAccountsPending,
+        payoutRetriesQueued: counts[1] ?? fallback.payoutRetriesQueued,
+        webhookEventsPending: counts[2] ?? fallback.webhookEventsPending,
+        accountingExceptions: counts[3] ?? fallback.accountingExceptions,
+        tenantLifecycleTasks: counts[4] ?? fallback.tenantLifecycleTasks,
+        approvalTasks: counts[5] ?? fallback.approvalTasks,
+        marketplaceDisputes: counts[6] ?? fallback.marketplaceDisputes,
+        notificationsQueued: counts[7] ?? fallback.notificationsQueued,
+        documentsPendingReview: counts[8] ?? fallback.documentsPendingReview,
+        jobsFailing: counts[9] ?? fallback.jobsFailing,
+        analyticsSnapshots: counts[10] ?? fallback.analyticsSnapshots,
+        securityIncidentsOpen: counts[11] ?? fallback.securityIncidentsOpen
+    };
+    setStoredEnterpriseSnapshot(snapshot);
+    return snapshot;
+};
+
+export const getSystemHealthWorkspace = async (): Promise<SystemHealthWorkspace> => {
+    const snapshot = await getEnterpriseOpsSnapshot();
+
+    const [jobsResponse, incidentsResponse, webhooksResponse, auditCount] = await Promise.all([
+        supabase
+            .from('job_runs')
+            .select('id, job_type, status, attempts, next_run_at')
+            .in('status', ['failed', 'retrying'])
+            .order('updated_at', { ascending: false })
+            .limit(8),
+        supabase
+            .from('security_incidents')
+            .select('id, title, severity, status, created_at')
+            .in('status', ['open', 'monitoring'])
+            .order('created_at', { ascending: false })
+            .limit(8),
+        supabase
+            .from('razorpay_webhook_events')
+            .select('id, event_name, processing_status, created_at')
+            .in('processing_status', ['received', 'failed'])
+            .order('created_at', { ascending: false })
+            .limit(8),
+        safeCount('audit_log_entries')
+    ]);
+
+    if (jobsResponse.error) throw jobsResponse.error;
+    if (incidentsResponse.error) throw incidentsResponse.error;
+    if (webhooksResponse.error) throw webhooksResponse.error;
+
+    return {
+        snapshot,
+        auditLogCount: auditCount ?? 0,
+        failedJobs: ((jobsResponse.data as any) || []),
+        securityIncidents: ((incidentsResponse.data as any) || []),
+        webhookBacklog: ((webhooksResponse.data as any) || [])
+    };
+};
+
+export const getIntegrationsWorkspace = async (): Promise<IntegrationStatus[]> => {
+    const snapshot = await getEnterpriseOpsSnapshot();
+    return [
+        {
+            id: 'razorpay-route',
+            name: 'Razorpay Route',
+            category: 'payments',
+            status: snapshot.linkedAccountsPending > 0 ? 'pending_kyc' : 'connected',
+            description: 'Owner linked accounts, direct settlements, transfer retries, and webhook-driven reconciliation.',
+            action_label: 'Manage payouts'
+        },
+        {
+            id: 'communications',
+            name: 'WhatsApp / SMS / Email',
+            category: 'communications',
+            status: snapshot.notificationsQueued > 0 ? 'configuration_needed' : 'connected',
+            description: 'Notification engine for reminders, alerts, escalations, and lifecycle messaging.',
+            action_label: 'Configure channels'
+        },
+        {
+            id: 'documents',
+            name: 'Document Review Pipeline',
+            category: 'documents',
+            status: snapshot.documentsPendingReview > 0 ? 'configuration_needed' : 'connected',
+            description: 'Agreement files, KYC reviews, signatures, and payment proof verification workflow.',
+            action_label: 'Review documents'
+        },
+        {
+            id: 'ops-monitoring',
+            name: 'Ops Monitoring',
+            category: 'ops',
+            status: snapshot.jobsFailing > 0 || snapshot.securityIncidentsOpen > 0 ? 'configuration_needed' : 'connected',
+            description: 'Audit logs, anomaly monitoring, retry workers, and operations alerts.',
+            action_label: 'Open health desk'
+        },
+        {
+            id: 'analytics',
+            name: 'Analytics & BI',
+            category: 'analytics',
+            status: snapshot.analyticsSnapshots > 0 ? 'connected' : 'configuration_needed',
+            description: 'Executive KPI snapshots, collections analytics, dispute tracking, and reporting exports.',
+            action_label: 'View analytics'
+        }
+    ];
+};
+
+export const getAnalyticsWorkspace = async (): Promise<AnalyticsWorkspace> => {
+    const snapshot = await getEnterpriseOpsSnapshot();
+    const finance = await getFinanceERPWorkspace();
+    const maintenance = await getMaintenanceERPWorkspace();
+
+    return {
+        snapshot,
+        collections: {
+            totalCollected: finance.payouts.filter((payout) => payout.payout_status === 'paid_out').reduce((sum, payout) => sum + payout.amount, 0),
+            pendingPayouts: finance.payouts.filter((payout) => payout.payout_status !== 'paid_out').reduce((sum, payout) => sum + payout.amount, 0),
+            overdueInvoices: finance.invoices.filter((invoice) => invoice.status === 'overdue').reduce((sum, invoice) => sum + invoice.outstanding_amount, 0),
+            retryQueueAmount: finance.payouts.filter((payout) => payout.payout_status === 'failed').reduce((sum, payout) => sum + payout.amount, 0)
+        },
+        operations: {
+            openWorkOrders: maintenance.workOrders.filter((order) => order.status !== 'completed').length,
+            lifecycleTasks: snapshot.tenantLifecycleTasks,
+            documentsPendingReview: snapshot.documentsPendingReview,
+            disputeCount: snapshot.marketplaceDisputes
+        }
+    };
+};
+
+export const getAccountingExportRows = async (reportType: 'profit_loss' | 'expense_summary' | 'audit_compliance' | 'collections_control') => {
+    const finance = await getFinanceERPWorkspace();
+
+    if (reportType === 'collections_control') {
+        return finance.reconciliations.map((record) => ({
+            ReconciliationId: record.id,
+            InvoiceId: record.invoice_id || '',
+            PaymentId: record.payment_id || '',
+            Status: record.status,
+            Channel: record.channel,
+            ExpectedAmount: record.expected_amount,
+            DetectedAmount: record.detected_amount,
+            VarianceAmount: record.variance_amount,
+            DetectedOn: record.detected_on
+        }));
+    }
+
+    if (reportType === 'expense_summary') {
+        return finance.invoices.flatMap((invoice) =>
+            invoice.line_items.map((item) => ({
+                InvoiceNumber: invoice.invoice_number,
+                BillingMonth: invoice.billing_month,
+                Category: item.category,
+                Label: item.label,
+                Amount: item.amount,
+                Status: invoice.status
+            }))
+        );
+    }
+
+    if (reportType === 'audit_compliance') {
+        return finance.payouts.map((payout) => ({
+            PayoutId: payout.id,
+            PaymentId: payout.payment_id || '',
+            SettlementMode: payout.settlement_mode,
+            Destination: payout.destination_label,
+            Amount: payout.amount,
+            Status: payout.payout_status,
+            InitiatedOn: payout.initiated_on,
+            CompletedOn: payout.completed_on || ''
+        }));
+    }
+
+    return finance.invoices.map((invoice) => ({
+        InvoiceNumber: invoice.invoice_number,
+        BillingMonth: invoice.billing_month,
+        TotalAmount: invoice.total_amount,
+        OutstandingAmount: invoice.outstanding_amount,
+        Status: invoice.status,
+        IssuedOn: invoice.issued_on,
+        DueDate: invoice.due_date
+    }));
+};
+
+const isSupabaseRelationUnavailable = (error: any) =>
+    ['42P01', 'PGRST116', 'PGRST205'].includes(String(error?.code || '')) ||
+    /does not exist|could not find|relation/i.test(String(error?.message || ''));
+
+const safeCount = async (table: string, options?: { eq?: Record<string, string>; in?: Record<string, string[]>; notNull?: string }) => {
+    let query = supabase.from(table).select('*', { count: 'exact', head: true });
+    if (options?.eq) {
+        Object.entries(options.eq).forEach(([key, value]) => {
+            query = query.eq(key, value);
+        });
+    }
+    if (options?.in) {
+        Object.entries(options.in).forEach(([key, value]) => {
+            query = query.in(key, value);
+        });
+    }
+    if (options?.notNull) {
+        query = query.not(options.notNull, 'is', null);
+    }
+    const { count, error } = await query;
+    if (error) {
+        if (isSupabaseRelationUnavailable(error)) return null;
+        throw error;
+    }
+    return count || 0;
+};
+
+const getPersistedFinanceWorkspace = async (): Promise<FinanceERPWorkspace | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const [invoiceResponse, reconciliationResponse, payoutResponse] = await Promise.all([
+        supabase
+            .from('invoice_records')
+            .select('id, invoice_number, tenant_id, house_id, building_id, billing_month, issued_on, due_date, total_amount, outstanding_amount, status, line_items, notes')
+            .eq('owner_id', user.id)
+            .order('issued_on', { ascending: false }),
+        supabase
+            .from('payment_reconciliations')
+            .select('id, payment_id, invoice_id, detected_amount, expected_amount, variance_amount, status, channel, detected_on, notes')
+            .eq('owner_id', user.id)
+            .order('detected_on', { ascending: false }),
+        supabase
+            .from('owner_payouts')
+            .select('id, owner_id, building_id, payment_id, amount, payout_status, settlement_mode, destination_label, initiated_on, completed_on, notes')
+            .eq('owner_id', user.id)
+            .order('initiated_on', { ascending: false })
+    ]);
+
+    if (invoiceResponse.error || reconciliationResponse.error || payoutResponse.error) {
+        if (
+            isSupabaseRelationUnavailable(invoiceResponse.error)
+            || isSupabaseRelationUnavailable(reconciliationResponse.error)
+            || isSupabaseRelationUnavailable(payoutResponse.error)
+        ) {
+            return null;
+        }
+        throw invoiceResponse.error || reconciliationResponse.error || payoutResponse.error;
+    }
+
+    const invoices = (invoiceResponse.data || []).map((invoice: any) => ({
+        ...invoice,
+        total_amount: Number(invoice.total_amount || 0),
+        outstanding_amount: Number(invoice.outstanding_amount || 0),
+        line_items: Array.isArray(invoice.line_items) ? invoice.line_items : []
+    })) as InvoiceRecord[];
+    const reconciliations = (reconciliationResponse.data || []).map((record: any) => ({
+        ...record,
+        detected_amount: Number(record.detected_amount || 0),
+        expected_amount: Number(record.expected_amount || 0),
+        variance_amount: Number(record.variance_amount || 0)
+    })) as ReconciliationRecord[];
+    const payouts = (payoutResponse.data || []).map((payout: any) => ({
+        ...payout,
+        amount: Number(payout.amount || 0)
+    })) as OwnerPayoutRecord[];
+
+    if (invoices.length === 0 && reconciliations.length === 0 && payouts.length === 0) {
+        return null;
+    }
+
+    return { invoices, reconciliations, payouts };
+};
+
 const buildFinanceWorkspace = async (): Promise<FinanceERPWorkspace> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const stored = getStoredFinanceWorkspace();
+    const stored = shouldUseLocalErpPersistence() ? getStoredFinanceWorkspace() : { invoices: [], reconciliations: [], payouts: [] };
     const { data: houses, error: houseError } = await supabase
         .from('houses')
         .select('id, building_id, house_number, rent_amount, tenant_id, lease_end_date, buildings!inner(id, name, owner_id)')
@@ -2051,10 +2455,17 @@ const buildFinanceWorkspace = async (): Promise<FinanceERPWorkspace> => {
     return workspace;
 };
 
-export const getFinanceERPWorkspace = async (): Promise<FinanceERPWorkspace> => buildFinanceWorkspace();
+export const getFinanceERPWorkspace = async (): Promise<FinanceERPWorkspace> => {
+    const persisted = await getPersistedFinanceWorkspace();
+    if (persisted) return persisted;
+    if (!allowLocalFallback()) {
+        throw new Error('Finance ERP tables are not available. Apply the ERP Supabase migrations before using this workspace.');
+    }
+    return buildFinanceWorkspace();
+};
 
 export const runFinancialReconciliation = async (): Promise<ReconciliationRecord[]> => {
-    const workspace = await buildFinanceWorkspace();
+    const workspace = await getPersistedFinanceWorkspace() || await buildFinanceWorkspace();
     return workspace.reconciliations;
 };
 
@@ -2069,7 +2480,56 @@ export const getRentRollData = async (): Promise<any[]> => {
     }));
 };
 
+const getPersistedMaintenanceWorkspace = async (): Promise<MaintenanceERPWorkspace | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const requests = await getAllMaintenanceRequests();
+    const { data, error } = await supabase
+        .from('vendor_work_orders')
+        .select('id, maintenance_request_id, provider_id, priority, status, sla_due_at, assigned_at, started_at, completed_at, estimated_cost, actual_cost, notes, service_providers(name, phone_number, category)')
+        .eq('owner_id', user.id)
+        .order('sla_due_at', { ascending: true });
+
+    if (error) {
+        if (isSupabaseRelationUnavailable(error)) return null;
+        throw error;
+    }
+
+    if (!data?.length) return null;
+
+    const workOrders = (data || []).map((entry: any) => ({
+        id: entry.id,
+        maintenance_request_id: entry.maintenance_request_id,
+        provider_id: entry.provider_id,
+        provider_name: entry.service_providers?.name || null,
+        provider_phone_number: entry.service_providers?.phone_number || null,
+        service_category: entry.service_providers?.category || null,
+        priority: entry.priority,
+        sla_due_at: entry.sla_due_at,
+        assigned_at: entry.assigned_at,
+        started_at: entry.started_at,
+        completed_at: entry.completed_at,
+        status: entry.status,
+        estimated_cost: entry.estimated_cost ? Number(entry.estimated_cost) : null,
+        actual_cost: entry.actual_cost ? Number(entry.actual_cost) : null,
+        notes: entry.notes
+    })) as VendorWorkOrder[];
+
+    return {
+        openRequests: requests.filter((request) => request.status !== 'closed' && request.status !== 'resolved'),
+        overdueWorkOrders: workOrders.filter((entry) => new Date(entry.sla_due_at).getTime() < Date.now() && entry.status !== 'completed'),
+        workOrders
+    };
+};
+
 export const getMaintenanceERPWorkspace = async (): Promise<MaintenanceERPWorkspace> => {
+    const persisted = await getPersistedMaintenanceWorkspace();
+    if (persisted) return persisted;
+    if (!allowLocalFallback()) {
+        throw new Error('Maintenance ERP tables are not available. Apply the ERP Supabase migrations before using this workspace.');
+    }
+
     const requests = await getAllMaintenanceRequests();
     const providers = await getServiceProviders('All');
     const storedWorkOrders = getStoredWorkOrders();
@@ -2104,6 +2564,45 @@ export const getMaintenanceERPWorkspace = async (): Promise<MaintenanceERPWorksp
 };
 
 export const updateVendorWorkOrderStatus = async (workOrderId: string, status: VendorWorkOrder['status']): Promise<VendorWorkOrder | null> => {
+    const patch: Record<string, string> = { status };
+    if (status === 'in_progress') patch.started_at = new Date().toISOString();
+    if (status === 'completed') patch.completed_at = new Date().toISOString();
+
+    const { data: remoteUpdated, error } = await supabase
+        .from('vendor_work_orders')
+        .update(patch)
+        .eq('id', workOrderId)
+        .select('id, maintenance_request_id, provider_id, priority, status, sla_due_at, assigned_at, started_at, completed_at, estimated_cost, actual_cost, notes, service_providers(name, phone_number, category)')
+        .maybeSingle();
+
+    if (!error && remoteUpdated) {
+        return {
+            id: remoteUpdated.id,
+            maintenance_request_id: remoteUpdated.maintenance_request_id,
+            provider_id: remoteUpdated.provider_id,
+            provider_name: (remoteUpdated as any).service_providers?.name || null,
+            provider_phone_number: (remoteUpdated as any).service_providers?.phone_number || null,
+            service_category: (remoteUpdated as any).service_providers?.category || null,
+            priority: remoteUpdated.priority,
+            sla_due_at: remoteUpdated.sla_due_at,
+            assigned_at: remoteUpdated.assigned_at,
+            started_at: remoteUpdated.started_at,
+            completed_at: remoteUpdated.completed_at,
+            status: remoteUpdated.status,
+            estimated_cost: remoteUpdated.estimated_cost ? Number(remoteUpdated.estimated_cost) : null,
+            actual_cost: remoteUpdated.actual_cost ? Number(remoteUpdated.actual_cost) : null,
+            notes: remoteUpdated.notes
+        };
+    }
+
+    if (error && !isSupabaseRelationUnavailable(error)) {
+        throw error;
+    }
+
+    if (!allowLocalFallback()) {
+        throw new Error('Maintenance ERP updates require the vendor_work_orders table to be available in Supabase.');
+    }
+
     const entries = getStoredWorkOrders();
     let updated: VendorWorkOrder | null = null;
     const next = entries.map((entry) => {
@@ -2120,7 +2619,62 @@ export const updateVendorWorkOrderStatus = async (workOrderId: string, status: V
     return updated;
 };
 
+const getPersistedCRMWorkspace = async (): Promise<CRMWorkspace | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const leadResponse = await supabase
+        .from('crm_leads')
+        .select('id, building_id, house_id, owner_id, full_name, phone_number, email, source, stage, interested_in, budget, move_in_date, notes, created_at, updated_at')
+        .eq('owner_id', user.id)
+        .order('updated_at', { ascending: false });
+
+    if (leadResponse.error) {
+        if (isSupabaseRelationUnavailable(leadResponse.error)) return null;
+        throw leadResponse.error;
+    }
+
+    const leads = (leadResponse.data || []) as LeadRecord[];
+    if (!leads.length) return null;
+
+    const leadIds = leads.map((lead) => lead.id);
+    const [visitResponse, bookingResponse] = await Promise.all([
+        supabase
+            .from('crm_visits')
+            .select('id, lead_id, building_id, house_id, scheduled_for, status, notes')
+            .in('lead_id', leadIds)
+            .order('scheduled_for', { ascending: true }),
+        supabase
+            .from('crm_bookings')
+            .select('id, lead_id, building_id, house_id, booking_type, amount, status, created_at, notes')
+            .in('lead_id', leadIds)
+            .order('created_at', { ascending: false })
+    ]);
+
+    if (visitResponse.error || bookingResponse.error) {
+        if (isSupabaseRelationUnavailable(visitResponse.error) || isSupabaseRelationUnavailable(bookingResponse.error)) {
+            return { leads, visits: [], bookings: [] };
+        }
+        throw visitResponse.error || bookingResponse.error;
+    }
+
+    return {
+        leads,
+        visits: (visitResponse.data || []) as PropertyVisit[],
+        bookings: (bookingResponse.data || []).map((booking: any) => ({
+            ...booking,
+            amount: Number(booking.amount || 0)
+        })) as BookingRecord[]
+    };
+};
+
 export const getCRMWorkspace = async (): Promise<CRMWorkspace> => {
+    const persisted = await getPersistedCRMWorkspace();
+    if (persisted) return persisted;
+    if (!allowLocalFallback()) {
+        throw new Error('CRM ERP tables are not available. Apply the ERP Supabase migrations before using this workspace.');
+    }
+
     const stored = getStoredCRMWorkspace();
     if (stored.leads.length > 0 || stored.visits.length > 0 || stored.bookings.length > 0) {
         return stored;
@@ -2177,6 +2731,25 @@ export const getCRMWorkspace = async (): Promise<CRMWorkspace> => {
 };
 
 export const updateLeadStage = async (leadId: string, stage: LeadRecord['stage']): Promise<LeadRecord | null> => {
+    const { data: remoteUpdated, error } = await supabase
+        .from('crm_leads')
+        .update({ stage, updated_at: new Date().toISOString() })
+        .eq('id', leadId)
+        .select('id, building_id, house_id, owner_id, full_name, phone_number, email, source, stage, interested_in, budget, move_in_date, notes, created_at, updated_at')
+        .maybeSingle();
+
+    if (!error && remoteUpdated) {
+        return remoteUpdated as LeadRecord;
+    }
+
+    if (error && !isSupabaseRelationUnavailable(error)) {
+        throw error;
+    }
+
+    if (!allowLocalFallback()) {
+        throw new Error('CRM stage updates require the crm_leads table to be available in Supabase.');
+    }
+
     const workspace = getStoredCRMWorkspace();
     let updated: LeadRecord | null = null;
     const leads = workspace.leads.map((lead) => {
@@ -2300,6 +2873,26 @@ export const getMarketplaceListings = async (): Promise<Listing[]> => {
     return data || [];
 };
 
+export const getMarketplaceListingById = async (listingId: number | string): Promise<Listing | null> => {
+    const parsedId = Number(listingId);
+    if (!Number.isFinite(parsedId)) throw new Error('Invalid property listing id.');
+
+    const publicPayload = await invokeEdgeFunction<Listing>('public-marketplace', {
+        action: 'property_by_id',
+        listingId: parsedId
+    });
+    if (publicPayload) {
+        return publicPayload;
+    }
+
+    const { data, error } = await supabase.from('marketplace_view').select('*').eq('id', parsedId).maybeSingle();
+    if (error) {
+        throw new Error(`Failed to fetch property listing: ${error.message || 'Unknown database error.'}`);
+    }
+
+    return (data as Listing | null) || null;
+};
+
 export const createMarketplaceListings = async (listings: NewListingData[]): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not found");
@@ -2308,8 +2901,52 @@ export const createMarketplaceListings = async (listings: NewListingData[]): Pro
 };
 
 export const getProductMarketplaceListings = async (): Promise<ProductListing[]> => {
+    const { data, error } = await supabase
+        .from('marketplace_product_listings')
+        .select('id, created_at, seller_id, seller_name, seller_role, title, description, price, category, condition, contact_info, location, images')
+        .order('created_at', { ascending: false });
+
+    if (!error) {
+        return ((data as any[]) || []).map((entry) => ({
+            ...entry,
+            price: Number(entry.price || 0)
+        })) as ProductListing[];
+    }
+
+    if (!isSupabaseRelationUnavailable(error) || !allowLocalFallback()) {
+        throw new Error(`Failed to fetch product listings: ${error.message || 'Unknown database error.'}`);
+    }
+
     return getStoredProductMarketplaceListings()
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+};
+
+export const getProductMarketplaceListingById = async (productId: string): Promise<ProductListing | null> => {
+    if (!productId) throw new Error('Invalid product listing id.');
+
+    const publicPayload = await invokeEdgeFunction<ProductListing>('public-marketplace', {
+        action: 'product_by_id',
+        productId
+    });
+    if (publicPayload) {
+        return publicPayload;
+    }
+
+    const { data, error } = await supabase
+        .from('marketplace_product_listings')
+        .select('id, created_at, seller_id, seller_name, seller_role, title, description, price, category, condition, contact_info, location, images')
+        .eq('id', productId)
+        .maybeSingle();
+
+    if (!error) {
+        return data ? ({ ...data, price: Number((data as any).price || 0) } as ProductListing) : null;
+    }
+
+    if (isSupabaseRelationUnavailable(error) && allowLocalFallback()) {
+        return getStoredProductMarketplaceListings().find((entry) => entry.id === productId) || null;
+    }
+
+    throw new Error(`Failed to fetch product listing: ${error.message || 'Unknown database error.'}`);
 };
 
 export const createProductMarketplaceListing = async (
@@ -2326,12 +2963,42 @@ export const createProductMarketplaceListing = async (
 
     const entry: ProductListing = {
         ...payload,
-        id: `product_${Date.now()}`,
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `product_${Date.now()}`,
         created_at: new Date().toISOString(),
         seller_id: user.id,
         seller_name: profile?.full_name || user.user_metadata?.full_name || 'Nilayam Seller',
         seller_role: (profile?.role as UserRole | null | undefined) || (user.user_metadata?.role as UserRole | null | undefined) || null
     };
+
+    const { data, error } = await supabase
+        .from('marketplace_product_listings')
+        .insert({
+            id: entry.id,
+            seller_id: entry.seller_id,
+            seller_name: entry.seller_name,
+            seller_role: entry.seller_role,
+            title: entry.title,
+            description: entry.description,
+            price: entry.price,
+            category: entry.category,
+            condition: entry.condition,
+            contact_info: entry.contact_info,
+            location: entry.location || null,
+            images: entry.images || []
+        })
+        .select('id, created_at, seller_id, seller_name, seller_role, title, description, price, category, condition, contact_info, location, images')
+        .single();
+
+    if (!error && data) {
+        return {
+            ...(data as any),
+            price: Number((data as any).price || 0)
+        } as ProductListing;
+    }
+
+    if (!isSupabaseRelationUnavailable(error) || !allowLocalFallback()) {
+        throw new Error(error?.message || 'Unable to create product listing in Supabase.');
+    }
 
     const current = getStoredProductMarketplaceListings();
     setStoredProductMarketplaceListings([entry, ...current]);

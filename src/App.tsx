@@ -1,6 +1,6 @@
 
 import React, { lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import Spinner from '@/components/ui/Spinner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import TenantSidebar from '@/components/layout/TenantSidebar';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
+import { getShellPlatform } from '@/utils/platform';
 
 // Lazy Pages
 const RoleSelectionPage = lazy(() => import('./pages/RoleSelectionPage'));
@@ -38,7 +39,12 @@ const AIHubPage = lazy(() => import('./pages/AIHubPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const LocalServicesPage = lazy(() => import('./pages/LocalServicesPage'));
 const OpportunityBoardPage = lazy(() => import('./pages/OpportunityBoardPage'));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
+const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage'));
+const StrategyHubPage = lazy(() => import('./pages/StrategyHubPage'));
 const SupportBot = lazy(() => import('@/components/ai/SupportBot'));
+const PublicPropertyListingPage = lazy(() => import('./pages/PublicPropertyListingPage'));
+const PublicProductListingPage = lazy(() => import('./pages/PublicProductListingPage'));
 
 const LoadingFallback = () => {
     return (
@@ -67,40 +73,47 @@ const hasTenantIdentity = (profile: any, session: any) => {
 const OwnerLayout = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     return (
-        <div className="ornate-shell flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
-            <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
+        <div className="ornate-shell flex h-screen flex-col overflow-hidden bg-neutral-50 pt-safe dark:bg-neutral-950" data-shell-platform={shellPlatform}>
+            <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} isAppShell={isAppShell} />
             <div className="flex flex-1 overflow-hidden">
-                <Sidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-                <main className="ornate-surface flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
+                <Sidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} isAppShell={isAppShell} />
+                <main className={`ornate-surface flex-1 overflow-y-auto ${isAppShell ? 'px-4 py-4 pb-[calc(env(safe-area-inset-bottom,0px)+6rem)]' : 'px-5 py-6 md:px-6 lg:px-8 xl:px-10 pb-10'}`}>
                     <ErrorBoundary>
                         <Suspense fallback={<Spinner />}>
-                            <Routes>
-                                <Route path="/dashboard" element={<OwnerDashboard />} />
-                                <Route path="/properties" element={<PropertiesPage />} />
-                                <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
-                                <Route path="/tenants" element={<TenantsPage />} />
-                                <Route path="/agreements" element={<AgreementsPage />} />
-                                <Route path="/payments" element={<PaymentsPage />} />
-                                <Route path="/financials" element={<FinancialsPage />} />
-                                <Route path="/maintenance" element={<MaintenancePage />} />
-                                <Route path="/announcements" element={<AnnouncementsPage />} />
-                                <Route path="/marketplace" element={<MarketplacePage />} />
-                                <Route path="/profile" element={<ProfilePage />} />
-                                <Route path="/community" element={<CommunityPage />} />
-                                <Route path="/community-events" element={<CommunityEventsPage />} />
-                                <Route path="/ai-hub" element={<AIHubPage />} />
-                                <Route path="/reports" element={<ReportsPage />} />
-                                <Route path="/services" element={<LocalServicesPage />} />
-                                <Route path="/crm" element={<OpportunityBoardPage />} />
-                                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                            </Routes>
+                            <div className={isAppShell ? 'mx-auto w-full max-w-3xl' : 'mx-auto w-full max-w-[1680px]'}>
+                                <Routes>
+                                    <Route path="/dashboard" element={<OwnerDashboard />} />
+                                    <Route path="/properties" element={<PropertiesPage />} />
+                                    <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
+                                    <Route path="/tenants" element={<TenantsPage />} />
+                                    <Route path="/agreements" element={<AgreementsPage />} />
+                                    <Route path="/payments" element={<PaymentsPage />} />
+                                    <Route path="/financials" element={<FinancialsPage />} />
+                                    <Route path="/maintenance" element={<MaintenancePage />} />
+                                    <Route path="/announcements" element={<AnnouncementsPage />} />
+                                    <Route path="/marketplace" element={<MarketplacePage />} />
+                                    <Route path="/profile" element={<ProfilePage />} />
+                                    <Route path="/community" element={<CommunityPage />} />
+                                    <Route path="/community-events" element={<CommunityEventsPage />} />
+                                    <Route path="/ai-hub" element={<AIHubPage />} />
+                                    <Route path="/reports" element={<ReportsPage />} />
+                                    <Route path="/services" element={<LocalServicesPage />} />
+                                    <Route path="/crm" element={<OpportunityBoardPage />} />
+                                    <Route path="/integrations" element={<IntegrationsPage />} />
+                                    <Route path="/system-health" element={<SystemHealthPage />} />
+                                    <Route path="/strategy-hub" element={<StrategyHubPage />} />
+                                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                                </Routes>
+                            </div>
                         </Suspense>
                     </ErrorBoundary>
                 </main>
             </div>
-            <MobileBottomNav onMenuClick={() => setIsMobileOpen(true)} />
+            <MobileBottomNav onMenuClick={() => setIsMobileOpen(true)} isAppShell={isAppShell} />
             <Suspense fallback={null}>
                 <SupportBot />
             </Suspense>
@@ -111,32 +124,36 @@ const OwnerLayout = () => {
 const TenantLayout = () => {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     return (
-        <div className="ornate-shell flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
-            <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
+        <div className="ornate-shell flex h-screen flex-col overflow-hidden bg-neutral-50 pt-safe dark:bg-neutral-950" data-shell-platform={shellPlatform}>
+            <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} isAppShell={isAppShell} />
             <div className="flex flex-1 overflow-hidden">
-                <TenantSidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-                <main className="ornate-surface flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
+                <TenantSidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} isAppShell={isAppShell} />
+                <main className={`ornate-surface flex-1 overflow-y-auto ${isAppShell ? 'px-4 py-4 pb-[calc(env(safe-area-inset-bottom,0px)+6rem)]' : 'px-5 py-6 md:px-6 lg:px-8 xl:px-10 pb-10'}`}>
                     <ErrorBoundary>
                         <Suspense fallback={<Spinner />}>
-                            <Routes>
-                                <Route path="/tenant-dashboard" element={<TenantDashboard />} />
-                                <Route path="/community" element={<CommunityPage />} />
-                                <Route path="/agreements" element={<AgreementsPage />} />
-                                <Route path="/feedback" element={<TenantFeedbackPage />} />
-                                <Route path="/tenant-maintenance" element={<TenantMaintenancePage />} />
-                                <Route path="/services" element={<LocalServicesPage />} />
-                                <Route path="/community-events" element={<CommunityEventsPage />} />
-                                <Route path="/profile" element={<ProfilePage />} />
-                                <Route path="/marketplace" element={<MarketplacePage />} />
-                                <Route path="*" element={<Navigate to="/tenant-dashboard" replace />} />
-                            </Routes>
+                            <div className={isAppShell ? 'mx-auto w-full max-w-3xl' : 'mx-auto w-full max-w-[1600px]'}>
+                                <Routes>
+                                    <Route path="/tenant-dashboard" element={<TenantDashboard />} />
+                                    <Route path="/community" element={<CommunityPage />} />
+                                    <Route path="/agreements" element={<AgreementsPage />} />
+                                    <Route path="/feedback" element={<TenantFeedbackPage />} />
+                                    <Route path="/tenant-maintenance" element={<TenantMaintenancePage />} />
+                                    <Route path="/services" element={<LocalServicesPage />} />
+                                    <Route path="/community-events" element={<CommunityEventsPage />} />
+                                    <Route path="/profile" element={<ProfilePage />} />
+                                    <Route path="/marketplace" element={<MarketplacePage />} />
+                                    <Route path="*" element={<Navigate to="/tenant-dashboard" replace />} />
+                                </Routes>
+                            </div>
                         </Suspense>
                     </ErrorBoundary>
                 </main>
             </div>
-            <MobileBottomNav onMenuClick={() => setIsMobileOpen(true)} />
+            <MobileBottomNav onMenuClick={() => setIsMobileOpen(true)} isAppShell={isAppShell} />
             <Suspense fallback={null}>
                 <SupportBot />
             </Suspense>
@@ -148,6 +165,7 @@ const App: React.FC = () => {
     const { session, profile, effectiveRole, loading, signOut } = useAuth();
     const pendingRoleSetup = hasPendingRoleSetup();
     const tenantIdentityReady = hasTenantIdentity(profile, session);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
 
     React.useEffect(() => {
         if (effectiveRole) {
@@ -174,15 +192,24 @@ const App: React.FC = () => {
         }
     }, [effectiveRole, loading, pendingRoleSetup, session, signOut]);
 
+    React.useEffect(() => {
+        if (typeof document === 'undefined') return;
+        document.body.setAttribute('data-shell-platform', shellPlatform);
+    }, [shellPlatform]);
+
     if (loading) {
         return <LoadingFallback />;
     }
 
+    const AppRouter = shellPlatform === 'app' ? HashRouter : BrowserRouter;
+
     return (
-        <HashRouter>
+        <AppRouter>
             <DataProvider>
                 <Suspense fallback={<LoadingFallback />}>
                     <Routes>
+                        <Route path="/marketplace/properties/:listingId" element={<PublicPropertyListingPage />} />
+                        <Route path="/marketplace/products/:productId" element={<PublicProductListingPage />} />
                         {/* Public Route: Landing Page is ALWAYS at / unless signed in */}
                         <Route path="/" element={
                             session ? <Navigate to="/dashboard-router" replace /> : 
@@ -225,13 +252,12 @@ const App: React.FC = () => {
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             )
                         ) : (
-                            /* Not logged in and not on Landing/Auth? Redirect to Landing */
                             <Route path="*" element={<Navigate to="/" replace />} />
                         )}
                     </Routes>
                 </Suspense>
             </DataProvider>
-        </HashRouter>
+        </AppRouter>
     );
 };
 

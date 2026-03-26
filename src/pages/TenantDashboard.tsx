@@ -10,7 +10,7 @@ import { RazorpayButton } from '@/components/payments/RazorpayButton';
 import { EmptyInboxIllustration, EmptyLedgerIllustration, QuietMaintenanceIllustration, WaitingHomeIllustration } from '@/components/ui/StateIllustrations';
 import { Link } from 'react-router-dom';
 import { Copy, Check } from 'lucide-react';
-import { copyText, openPhoneDialer, openWhatsAppChat } from '@/utils/sharing';
+import { copyText, openExternalIntent, openPhoneDialer, openWhatsAppChat } from '@/utils/sharing';
 
 const InfoCard: React.FC<{ title: string; value: string | number; subtext?: string; icon: React.ReactNode; children?: React.ReactNode; delay: string }> = ({ title, value, subtext, icon, children, delay }) => (
     <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: delay }}>
@@ -206,13 +206,7 @@ const openUpiIntent = (app: 'gpay' | 'phonepe' | 'bhim' | 'paytm' | 'generic', l
         paytm: `paytmmp://pay?${query}`
     };
 
-    window.location.href = appLinks[app];
-
-    window.setTimeout(() => {
-        if (document.visibilityState === 'visible') {
-            window.location.href = link;
-        }
-    }, 700);
+    openExternalIntent(appLinks[app], link);
 };
 
 const ManualPaymentCard: React.FC<{
@@ -534,7 +528,7 @@ const TenantDashboard: React.FC = () => {
     const ownerName = data.landlordContact?.name || data.landlordPaymentDetails?.payeeName || 'Property Owner';
 
     return (
-            <div className="space-y-6 animate-fade-in md:space-y-8">
+            <div className="space-y-6 animate-fade-in md:space-y-7 xl:space-y-8">
             <div className="overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-[linear-gradient(135deg,#eff6ff,#ffffff_52%,#ecfeff)] p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] dark:border-neutral-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] md:p-7">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between animate-fade-in-up">
                     <div className="max-w-2xl">
@@ -606,7 +600,7 @@ const TenantDashboard: React.FC = () => {
 
             {/* BhimPaymentGateway removed */}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
                 <InfoCard
                     title="My Residence"
                     value={data.tenancyDetails.building_name}
@@ -685,7 +679,7 @@ const TenantDashboard: React.FC = () => {
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:gap-8">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:gap-8 2xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="space-y-6 xl:space-y-8">
                     {data.nextPayment && !supportsRazorpay && (
                         <ManualPaymentCard data={data} tenantId={profile?.id || ''} onSubmitted={() => refreshData(true)} />

@@ -10,6 +10,7 @@ import PredictiveRevenueChart from '../components/insights/PredictiveRevenueChar
 import { InsightsIcon, BrainCircuitIcon, FileTextIcon } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
+import { getShellPlatform } from '@/utils/platform';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -66,6 +67,8 @@ const FinancialsPage: React.FC = () => {
     const [showForecast, setShowForecast] = useState(false);
     const [trendData, setTrendData] = useState<FinancialDataPoint[]>([]);
     const [trendLoading, setTrendLoading] = useState(false);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const fetchSummary = useCallback(async () => {
         setLoading(prev => ({ ...prev, summary: true }));
@@ -184,15 +187,21 @@ const FinancialsPage: React.FC = () => {
     const reviewCount = erpWorkspace?.reconciliations.filter((record) => record.status === 'review_required').length || 0;
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20 md:pb-0 print:p-0 print:space-y-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
-                <h2 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">{t('financials.title')}</h2>
+        <div className={`animate-fade-in print:p-0 print:space-y-4 ${isAppShell ? 'space-y-6 pb-20 md:pb-0' : 'space-y-8 pb-6'}`}>
+            <section className={`print:hidden overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f5f3ff_100%)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] ${isAppShell ? 'p-5' : 'p-6 xl:p-8'}`}>
+            <div className={`flex justify-between gap-4 ${isAppShell ? 'flex-col items-start' : 'flex-col md:flex-row md:items-end'} print:hidden`}>
+                <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600 dark:text-blue-300">Finance ERP</p>
+                    <h2 className="text-3xl font-bold text-neutral-900 dark:text-neutral-100">{t('financials.title')}</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-7 text-neutral-500 dark:text-neutral-400">Statements, invoice ledger, reconciliation, and owner settlement controls tuned for web and mobile operations.</p>
+                </div>
                 <div className="flex gap-2 w-full md:w-auto">
                     <button onClick={handleReconcile} className="flex-1 md:flex-none btn btn-primary shadow-sm">Reconcile Transactions</button>
                     <button onClick={() => handleExport('pdf')} className="flex-1 md:flex-none btn bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700">{t('financials.print')}</button>
                     <button onClick={() => handleExport('csv')} className="flex-1 md:flex-none btn btn-secondary shadow-sm">{t('financials.export')}</button>
                 </div>
             </div>
+            </section>
             
             {/* Print Header */}
             <div className="hidden print:block text-center mb-8">
@@ -215,7 +224,7 @@ const FinancialsPage: React.FC = () => {
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+            <div className={`grid grid-cols-1 gap-4 ${isAppShell ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
                 <Card className="bg-gradient-to-br from-violet-50 to-white dark:from-neutral-800 dark:to-neutral-900">
                     <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Invoices Issued</p>
                     <p className="mt-2 text-3xl font-bold text-violet-600 dark:text-violet-400">₹{invoiceTotals.total.toLocaleString('en-IN')}</p>
@@ -258,7 +267,7 @@ const FinancialsPage: React.FC = () => {
 
             {/* Insights Charts - Hidden in Print */}
             {(showPLTrend || showForecast) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in print:hidden">
+            <div className={`grid grid-cols-1 gap-6 animate-fade-in print:hidden ${isAppShell ? '' : 'lg:grid-cols-2'}`}>
                     {showPLTrend && (
                         <Card>
                             <h3 className="text-xl font-bold mb-4 text-neutral-800 dark:text-neutral-200">Profit & Loss Trend (Last 6 Months)</h3>
@@ -279,7 +288,7 @@ const FinancialsPage: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className={`grid grid-cols-1 gap-6 ${isAppShell ? '' : 'xl:grid-cols-[1.1fr_0.9fr]'}`}>
                 <Card>
                     <div className="flex items-center justify-between gap-4 mb-5">
                         <div>
@@ -346,7 +355,7 @@ const FinancialsPage: React.FC = () => {
                 </Card>
             </div>
 
-            <Card className="p-4 md:p-6 print:shadow-none print:border-0">
+            <Card className={`print:shadow-none print:border-0 ${isAppShell ? 'p-4' : 'p-4 md:p-6 rounded-[1.8rem]'}`}>
                 <h3 className="text-xl font-bold mb-6 text-neutral-800 dark:text-neutral-200">{t('financials.history')}</h3>
                 
                 {/* Filters - Hidden in Print */}

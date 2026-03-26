@@ -1,6 +1,8 @@
 name: Continuous Integration
 
 on:
+  push:
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -17,6 +19,13 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: 'maven'
 
     - name: Install dependencies
       run: npm ci
@@ -49,6 +58,10 @@ jobs:
 
     - name: Test Frontend Docker Build
       run: docker build --target builder -t nilayam-frontend:test .
+
+    - name: Package Java Backend
+      run: mvn -q -DskipTests package
+      working-directory: backend-java
 
     - name: Test Backend Docker Build
       run: docker build -f Dockerfile.backend -t nilayam-backend:test .

@@ -8,6 +8,7 @@ import { UserRole } from '@/types';
 
 interface MobileBottomNavProps {
     onMenuClick: () => void;
+    isAppShell: boolean;
 }
 
 // Custom Menu Icon for the nav bar
@@ -15,7 +16,7 @@ const MenuBarsIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
 );
 
-const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick }) => {
+const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick, isAppShell }) => {
     const location = useLocation();
     const { t } = useLanguage();
     
@@ -36,7 +37,7 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick }) => {
     const navItems = effectiveRole === UserRole.Tenant ? tenantNavItems : ownerNavItems;
 
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50">
+        <nav className={`${isAppShell ? 'fixed' : 'fixed md:hidden'} bottom-0 left-0 right-0 z-50`}>
             {/* Gradient Fade to seamless blend content */}
             <div className="absolute -top-10 left-0 right-0 h-10 bg-gradient-to-t from-white/90 dark:from-neutral-950/90 to-transparent pointer-events-none"></div>
             

@@ -6,6 +6,7 @@ import { getMaintenanceRequests, getMaintenanceERPWorkspace, updateVendorWorkOrd
 import PaginationControls from '../components/ui/PaginationControls';
 import Spinner from '../components/ui/Spinner';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getShellPlatform } from '@/utils/platform';
 // import DatabaseFixInstructions from '../components/auth/DatabaseFixInstructions'; // Removed as file is missing
 
 const ITEMS_PER_PAGE = 10;
@@ -55,6 +56,8 @@ const MaintenancePage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | undefined>(undefined);
     const [workspace, setWorkspace] = useState<MaintenanceERPWorkspace | null>(null);
     const [updatingWorkOrder, setUpdatingWorkOrder] = useState<string | null>(null);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const fetchRequests = useCallback(async (page: number, status?: MaintenanceStatus) => {
         setLoading(true);
@@ -160,10 +163,23 @@ const MaintenancePage: React.FC = () => {
     ];
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <h2 className="text-3xl font-bold text-blue-900 dark:text-slate-200">{t('maintenance.title')}</h2>
+        <div className={`animate-fade-in ${isAppShell ? 'space-y-6 pb-20 md:pb-0' : 'space-y-8 pb-6'}`}>
+            <section className={`overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#eff6ff_100%)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] ${isAppShell ? 'p-5' : 'p-6 xl:p-8'}`}>
+                <div className={`flex gap-4 ${isAppShell ? 'flex-col' : 'flex-col lg:flex-row lg:items-end lg:justify-between'}`}>
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-600 dark:text-orange-300">Helpdesk operations</p>
+                        <h2 className="text-3xl font-bold text-blue-900 dark:text-slate-200">{t('maintenance.title')}</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">Track resident issues, SLA risk, and vendor execution with a more structured web desk and faster mobile review flow.</p>
+                    </div>
+                    {!isAppShell && workspace && (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                            {workspace.workOrders.length} live work orders • {workspace.overdueWorkOrders.length} SLA risks
+                        </div>
+                    )}
+                </div>
+            </section>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className={`grid grid-cols-1 gap-4 ${isAppShell ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                 <Card className="bg-gradient-to-br from-orange-50 to-white dark:from-neutral-800 dark:to-neutral-900">
                     <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Open Requests</p>
                     <p className="mt-2 text-3xl font-bold text-orange-600 dark:text-orange-400">{workspace?.openRequests.length || 0}</p>
@@ -179,7 +195,7 @@ const MaintenancePage: React.FC = () => {
             </div>
 
             {workspace && (
-                <Card>
+                <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
                     <div className="flex items-center justify-between gap-4 mb-4">
                         <div>
                             <h3 className="text-xl font-bold text-neutral-900 dark:text-white">SLA & Vendor Dispatch Desk</h3>
@@ -221,7 +237,7 @@ const MaintenancePage: React.FC = () => {
                 </Card>
             )}
 
-            <Card>
+            <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex space-x-2 overflow-x-auto pb-1 scrollbar-hide">
                         {filterOptions.map(option => (

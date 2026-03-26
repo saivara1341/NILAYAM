@@ -6,6 +6,7 @@ import { OwnerPaymentsDashboard, Payment } from '@/types';
 import { BankIcon, CheckCircleIcon, CreditCardIcon, DollarSignIcon, QrCodeIcon, SearchIcon, ShieldCheckIcon } from '@/constants';
 import { Check, Copy } from 'lucide-react';
 import { copyText, openPhoneDialer, openWhatsAppChat } from '@/utils/sharing';
+import { getShellPlatform } from '@/utils/platform';
 
 const currency = (value: number) => `₹${value.toLocaleString('en-IN')}`;
 
@@ -82,6 +83,8 @@ const PaymentsPage: React.FC = () => {
     const [propertyId, setPropertyId] = useState('');
     const [search, setSearch] = useState('');
     const [busyPaymentId, setBusyPaymentId] = useState<string | null>(null);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const loadDashboard = useCallback(async () => {
         setLoading(true);
@@ -130,9 +133,11 @@ const PaymentsPage: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20 md:pb-0">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className={`animate-fade-in ${isAppShell ? 'space-y-6 pb-20 md:pb-0' : 'space-y-8 pb-6'}`}>
+            <section className={`overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_45%,#f0fdf4_100%)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] ${isAppShell ? 'p-5' : 'p-6 xl:p-8'}`}>
+            <div className={`flex gap-4 ${isAppShell ? 'flex-col' : 'flex-col lg:flex-row lg:items-end lg:justify-between'}`}>
                 <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600 dark:text-blue-300">Collections command</p>
                     <h2 className="text-3xl font-black tracking-tight text-neutral-900 dark:text-white">Payments</h2>
                     <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                         Review rent collections, verify manual proofs, and keep owner cash flow visible in one place.
@@ -146,6 +151,7 @@ const PaymentsPage: React.FC = () => {
                     Refresh
                 </button>
             </div>
+            </section>
 
             {error && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
@@ -162,7 +168,7 @@ const PaymentsPage: React.FC = () => {
                         <SummaryCard title="Collection Mix" value={`${dashboard.summary.onlinePaymentCount} online`} subtext={`${dashboard.summary.manualProofCount} manual proof${dashboard.summary.manualProofCount === 1 ? '' : 's'} awaiting`} icon={<BankIcon />} tone="from-violet-50 to-white dark:from-violet-950/20 dark:to-neutral-950" />
                     </div>
 
-                    <Card>
+                    <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                             <div className="relative md:col-span-2">
                                 <SearchIcon className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-neutral-400" />
@@ -196,7 +202,7 @@ const PaymentsPage: React.FC = () => {
                         </div>
                     </Card>
 
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                    <div className={`grid grid-cols-1 gap-6 ${isAppShell ? '' : '2xl:grid-cols-[1.18fr_0.82fr]'} xl:grid-cols-[1.1fr_0.9fr]`}>
                         <Card>
                             <div className="flex items-center justify-between gap-4">
                                 <div>
@@ -277,7 +283,7 @@ const PaymentsPage: React.FC = () => {
                         </Card>
                     </div>
 
-                    <Card>
+                    <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
                         <div className="flex items-center gap-2">
                             <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
                             <h3 className="text-xl font-black text-neutral-900 dark:text-white">All Matching Payments</h3>

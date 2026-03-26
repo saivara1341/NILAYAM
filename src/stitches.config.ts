@@ -125,6 +125,9 @@ export const globalStyles = globalCss({
     WebkitFontSmoothing: 'antialiased',
     MozOsxFontSmoothing: 'grayscale',
   },
+  'body[data-shell-platform="app"]': {
+    overscrollBehaviorY: 'none',
+  },
   'input, textarea, select': {
     color: '#0f172a',
     backgroundColor: '#ffffff',
@@ -243,6 +246,12 @@ export const globalStyles = globalCss({
       backgroundPosition: 'right -4rem top 5.5rem, left -5rem top 20rem, right -3rem bottom 14%, left -2rem bottom 7%',
       backgroundSize: '11rem 11rem, 11rem auto, 12rem 12rem, 8.5rem 8.5rem',
     },
+  },
+  '[data-shell-platform="web"] .ornate-surface': {
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.14), transparent 24%)',
+  },
+  '[data-shell-platform="app"] .ornate-surface': {
+    background: 'transparent',
   },
   '.ornate-surface': {
     position: 'relative',

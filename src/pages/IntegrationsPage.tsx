@@ -1,66 +1,82 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Card from '../components/ui/Card';
+import Spinner from '../components/ui/Spinner';
+import { IntegrationStatus } from '../types';
+import { getIntegrationsWorkspace } from '../services/api';
 import { PlugIcon } from '../constants';
 
-const IntegrationCard: React.FC<{ logo: string, name: string, description: string }> = ({ logo, name, description }) => (
-    <Card className="flex flex-col">
-        <div className="flex items-center gap-4 mb-4">
-            <img src={logo} alt={`${name} logo`} className="w-12 h-12 rounded-lg object-contain" />
-            <div>
-                <h3 className="text-lg font-bold text-neutral-800 dark:text-neutral-200">{name}</h3>
-                <span className="text-xs font-semibold px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">Connected</span>
-            </div>
-        </div>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400 flex-grow">{description}</p>
-        <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800">
-            <button className="w-full btn btn-secondary">Manage Settings</button>
-        </div>
-    </Card>
-);
+const badgeStyles: Record<IntegrationStatus['status'], string> = {
+    connected: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    configuration_needed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    pending_kyc: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+};
 
 const IntegrationsPage: React.FC = () => {
+    const [items, setItems] = useState<IntegrationStatus[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const load = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            setItems(await getIntegrationsWorkspace());
+        } catch (err: any) {
+            setItems([]);
+            setError(err?.message || 'Failed to load integrations workspace.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void load();
+    }, []);
+
+    if (loading) return <div className="flex min-h-[40vh] items-center justify-center"><Spinner /></div>;
+    if (error) {
+        return (
+            <Card className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-6 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                <h2 className="text-xl font-black">Integrations could not be loaded</h2>
+                <p className="mt-3 text-sm leading-7">{error}</p>
+                <button onClick={() => void load()} className="mt-4 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-900">
+                    Retry
+                </button>
+            </Card>
+        );
+    }
+
     return (
         <div className="space-y-8 animate-fade-in">
             <div>
-                <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-3">
-                    <PlugIcon className="w-8 h-8 text-blue-600" />
+                <h2 className="flex items-center gap-3 text-3xl font-bold text-neutral-900 dark:text-white">
+                    <PlugIcon className="h-8 w-8 text-blue-600" />
                     Integrations Hub
                 </h2>
-                <p className="mt-2 text-neutral-500 dark:text-neutral-400 max-w-3xl">
-                    Connect Nilayam with the tools your community already uses. Sync data, import history, and enhance your existing workflow with AI.
+                <p className="mt-2 max-w-3xl text-neutral-500 dark:text-neutral-400">
+                    Payments, communications, documents, monitoring, and analytics integrations required to run Nilayam as a production ERP platform.
                 </p>
             </div>
 
-            <Card>
-                <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mb-4">Community Management Platforms</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <IntegrationCard 
-                        logo="https://mygate.com/wp-content/uploads/2023/10/mg-logo-2.svg"
-                        name="MyGate"
-                        description="Sync visitor logs, service requests, and resident directories. Use Nilayam's AI for tenant scoring on top of MyGate's operational data."
-                    />
-                    <IntegrationCard 
-                        logo="https://is1-ssl.mzstatic.com/image/thumb/Purple126/v4/0c/36/83/0c368305-6453-e99c-3a47-a36329e47525/AppIcon-0-0-1x_U007emarketing-0-0-0-10-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/256x256bb.jpg"
-                        name="NoBrokerHood"
-                        description="Import payment histories for automated reconciliation in the CFO Dashboard. Use Nilayam's AI Lease Studio for residents onboarded via NoBrokerHood."
-                    />
-                    <IntegrationCard 
-                        logo="https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/91/9f/6e/919f6e4a-5f93-1815-dd53-529a65f1a1aa/AppIcon-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/256x256bb.jpg"
-                        name="ApnaComplex"
-                        description="Connect accounting data for advanced financial reporting and auditing. Migrate historical data seamlessly."
-                    />
-                </div>
-            </Card>
-
-            <Card>
-                <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mb-4">Data Migration</h3>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
-                    Switching to Nilayam? Don't lose your historical data. We provide tools to import your existing records from other platforms.
-                </p>
-                <button className="btn btn-primary">Start Data Migration Wizard</button>
-            </Card>
-
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {items.map((item) => (
+                    <Card key={item.id} className="flex flex-col">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <div>
+                                <h3 className="text-lg font-bold text-neutral-900 dark:text-white">{item.name}</h3>
+                                <p className="mt-1 text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">{item.category}</p>
+                            </div>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${badgeStyles[item.status]}`}>
+                                {item.status.replace('_', ' ')}
+                            </span>
+                        </div>
+                        <p className="flex-grow text-sm text-neutral-600 dark:text-neutral-400">{item.description}</p>
+                        <div className="mt-4 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+                            <button className="w-full btn btn-secondary">{item.action_label}</button>
+                        </div>
+                    </Card>
+                ))}
+            </div>
         </div>
     );
 };

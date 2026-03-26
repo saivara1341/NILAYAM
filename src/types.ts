@@ -399,7 +399,7 @@ export interface OwnerPayoutRecord {
     payment_id?: string | null;
     amount: number;
     payout_status: PayoutStatus;
-    settlement_mode: 'platform_to_owner' | 'direct_owner' | 'manual';
+    settlement_mode: 'platform_to_owner' | 'direct_owner' | 'manual' | 'razorpay_route';
     destination_label: string;
     initiated_on: string;
     completed_on?: string | null;
@@ -737,6 +737,72 @@ export interface CRMWorkspace {
     leads: LeadRecord[];
     visits: PropertyVisit[];
     bookings: BookingRecord[];
+}
+
+export interface EnterpriseOpsSnapshot {
+    linkedAccountsPending: number;
+    payoutRetriesQueued: number;
+    webhookEventsPending: number;
+    accountingExceptions: number;
+    tenantLifecycleTasks: number;
+    approvalTasks: number;
+    marketplaceDisputes: number;
+    notificationsQueued: number;
+    documentsPendingReview: number;
+    jobsFailing: number;
+    analyticsSnapshots: number;
+    securityIncidentsOpen: number;
+}
+
+export interface SystemHealthWorkspace {
+    snapshot: EnterpriseOpsSnapshot;
+    auditLogCount: number;
+    failedJobs: Array<{
+        id: string;
+        job_type: string;
+        status: string;
+        attempts: number;
+        next_run_at?: string | null;
+    }>;
+    securityIncidents: Array<{
+        id: string;
+        title: string;
+        severity: 'low' | 'medium' | 'high' | 'critical';
+        status: 'open' | 'monitoring' | 'resolved';
+        created_at: string;
+    }>;
+    webhookBacklog: Array<{
+        id: string;
+        event_name: string;
+        processing_status: string;
+        created_at: string;
+    }>;
+}
+
+export interface IntegrationStatus {
+    id: string;
+    name: string;
+    category: 'payments' | 'communications' | 'documents' | 'ops' | 'analytics';
+    status: 'connected' | 'configuration_needed' | 'pending_kyc';
+    description: string;
+    last_synced_at?: string | null;
+    action_label: string;
+}
+
+export interface AnalyticsWorkspace {
+    snapshot: EnterpriseOpsSnapshot;
+    collections: {
+        totalCollected: number;
+        pendingPayouts: number;
+        overdueInvoices: number;
+        retryQueueAmount: number;
+    };
+    operations: {
+        openWorkOrders: number;
+        lifecycleTasks: number;
+        documentsPendingReview: number;
+        disputeCount: number;
+    };
 }
 
 export interface ServiceReview {

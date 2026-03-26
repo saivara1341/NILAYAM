@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getShellPlatform } from '@/utils/platform';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -400,6 +401,8 @@ const PropertiesPage: React.FC = () => {
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const [immersiveConfig, setImmersiveConfig] = useState<{ isOpen: boolean; type: '3d' | '360'; url: string; title: string } | null>(null);
+    const shellPlatform = React.useMemo(() => getShellPlatform(), []);
+    const isAppShell = shellPlatform === 'app';
 
     const isBasicPlan = profile?.subscription_tier !== 'pro';
 
@@ -536,7 +539,7 @@ const PropertiesPage: React.FC = () => {
             );
         }
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className={`grid grid-cols-1 gap-4 ${isAppShell ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'} md:gap-5 xl:gap-6`}>
                 {properties.map(prop => (
                     <PropertyCard
                         key={prop.id}
@@ -646,33 +649,53 @@ const PropertiesPage: React.FC = () => {
                 </Modal>
             )}
 
-            <div className="space-y-6 animate-fade-in pb-20 md:pb-0">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                    <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-200">{t('properties.title')}</h2>
-                    <div className="flex gap-3 w-full sm:w-auto">
+            <div className={`animate-fade-in ${isAppShell ? 'space-y-6 pb-20 md:pb-0' : 'space-y-8 pb-6'}`}>
+                <section className={`overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_50%,#f8fafc_100%)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,1))] ${isAppShell ? 'p-5' : 'p-6 xl:p-8'}`}>
+                    <div className={`flex gap-6 ${isAppShell ? 'flex-col' : 'flex-col xl:flex-row xl:items-end xl:justify-between'}`}>
+                        <div className={isAppShell ? '' : 'max-w-3xl'}>
+                            <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-300">Portfolio workspace</p>
+                            <h2 className="mt-3 text-3xl font-black tracking-tight text-neutral-900 dark:text-white xl:text-5xl">{t('properties.title')}</h2>
+                            <p className="mt-2 text-sm leading-7 text-neutral-600 dark:text-neutral-300 xl:text-base">
+                                Manage buildings, units, immersive views, tenant assignment, and listing readiness with layouts tuned for larger screens on web and compact control on app.
+                            </p>
+                        </div>
+                        <div className={`flex gap-3 ${isAppShell ? 'w-full' : 'w-full xl:w-auto'}`}>
                         <button 
                             onClick={handleAiClick} 
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm font-black rounded-xl hover:scale-[1.02] transition-all shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 active:scale-95"
+                            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] hover:shadow-blue-600/40 active:scale-95"
                         >
                             <SparklesIcon className="w-4 h-4" />
                             {t('properties.ai_btn')}
                         </button>
                         <button 
                             onClick={handleAddClick} 
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-black rounded-xl hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all shadow-lg active:scale-95 border border-neutral-200 dark:border-neutral-800"
+                            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-neutral-900 px-6 py-3 text-sm font-black text-white shadow-lg transition-all hover:bg-neutral-800 active:scale-95 dark:border-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                         >
                             <PlusCircleIcon className="w-4 h-4" />
                             {t('properties.add_btn')}
                         </button>
                     </div>
                 </div>
+                </section>
 
                 <VacancyManager />
 
-                <div className="flex flex-wrap gap-2 items-center mb-6">
-                    <button
-                        onClick={() => setFilterType('all')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                <Card className={isAppShell ? '' : 'rounded-[1.8rem]'}>
+                    <div className={`flex items-start gap-4 ${isAppShell ? 'flex-col' : 'flex-col xl:flex-row xl:items-center xl:justify-between'}`}>
+                        <div>
+                            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400">Portfolio filters</p>
+                            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Switch between residential, commercial, and plotted inventory without losing context.</p>
+                        </div>
+                        {!isAppShell && (
+                            <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                                {totalProperties} total properties across your portfolio
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                        <button
+                            onClick={() => setFilterType('all')}
+                            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                             filterType === 'all'
                             ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                             : 'bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'
@@ -683,7 +706,7 @@ const PropertiesPage: React.FC = () => {
                     {Object.entries(PROPERTY_TYPE_CATEGORIES).map(([category, types]) => {
                         const isCategoryActive = types.includes(filterType as any);
                         return (
-                            <div key={category} className="relative group">
+                            <div key={category} className="relative group shrink-0">
                                 <button
                                     className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                                         isCategoryActive
@@ -712,7 +735,8 @@ const PropertiesPage: React.FC = () => {
                             </div>
                         );
                     })}
-                </div>
+                    </div>
+                </Card>
 
                 {renderContent()}
 

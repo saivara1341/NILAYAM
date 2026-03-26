@@ -8,9 +8,10 @@ interface TenantSidebarProps {
     isCollapsed: boolean;
     isMobileOpen: boolean;
     setIsMobileOpen: (isOpen: boolean) => void;
+    isAppShell: boolean;
 }
 
-const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobileOpen }) => {
+const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen, setIsMobileOpen, isAppShell }) => {
   const location = useLocation();
   const { t } = useLanguage();
 
@@ -19,7 +20,7 @@ const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen
         {/* Mobile Backdrop */}
         {isMobileOpen && (
             <div 
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-fade-in"
+                className={`fixed inset-0 z-40 animate-fade-in bg-black/60 backdrop-blur-sm ${isAppShell ? '' : 'md:hidden'}`}
                 onClick={() => setIsMobileOpen(false)}
             />
         )}
@@ -28,14 +29,13 @@ const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen
         <aside className={`
             fixed inset-y-0 left-0 z-50 h-full bg-white dark:bg-neutral-900 border-r border-neutral-200/60 dark:border-neutral-800 shadow-2xl md:shadow-none
             transition-transform duration-300 ease-in-out
-            md:relative md:translate-x-0
+            ${isAppShell ? '' : 'md:relative md:translate-x-0'}
             ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-            ${isCollapsed ? 'md:w-20' : 'md:w-64'}
-            w-72 md:w-auto
+            ${isAppShell ? 'w-80 max-w-[88vw]' : `${isCollapsed ? 'md:w-20' : 'md:w-64'} w-72 md:w-auto`}
         `}>
           <div className="flex flex-col h-full">
             {/* Mobile Header in Drawer */}
-            <div className="md:hidden flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-800">
+            <div className={`flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-800 ${isAppShell ? '' : 'md:hidden'}`}>
                   <span className="font-bold text-lg text-neutral-800 dark:text-neutral-200">Menu</span>
                   <button onClick={() => setIsMobileOpen(false)} className="p-2 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -55,10 +55,10 @@ const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen
                                 isActive 
                                 ? 'bg-blue-600 text-white shadow-md' 
                                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                            } ${isCollapsed ? 'justify-center h-12 px-0 md:px-0' : 'p-3 space-x-4'}`}
+                            } ${!isAppShell && isCollapsed ? 'justify-center h-12 px-0 md:px-0' : 'p-3 space-x-4'}`}
                         >
                             {link.icon}
-                            <span className={`font-medium ${isCollapsed ? 'md:hidden' : 'block'}`}>{t(link.labelKey)}</span>
+                            <span className={`font-medium ${!isAppShell && isCollapsed ? 'md:hidden' : 'block'}`}>{t(link.labelKey)}</span>
                         </NavLink>
                         </li>
                     );
@@ -67,7 +67,7 @@ const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen
 
                 <hr className="my-4 border-slate-200 dark:border-slate-800 mx-4" />
 
-                <div className={`px-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider ${isCollapsed ? 'md:hidden' : 'block'}`}>
+                <div className={`px-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider ${!isAppShell && isCollapsed ? 'md:hidden' : 'block'}`}>
                     {t('nav.community')}
                 </div>
 
@@ -84,12 +84,12 @@ const TenantSidebar: React.FC<TenantSidebarProps> = ({ isCollapsed, isMobileOpen
                                     link.disabled 
                                     ? 'cursor-not-allowed opacity-60' 
                                     : 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                                } ${isCollapsed ? 'justify-center h-12 px-0 md:px-0' : 'p-3 space-x-4'}`}
+                                } ${!isAppShell && isCollapsed ? 'justify-center h-12 px-0 md:px-0' : 'p-3 space-x-4'}`}
                                 title={link.disabled ? 'Coming Soon' : ''}
                             >
                                 {link.icon}
-                                <span className={`font-medium ${isCollapsed ? 'md:hidden' : 'block'}`}>{t(link.labelKey)}</span>
-                                {link.disabled && <span className={`text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-auto ${isCollapsed ? 'md:hidden' : 'block'}`}>Soon</span>}
+                                <span className={`font-medium ${!isAppShell && isCollapsed ? 'md:hidden' : 'block'}`}>{t(link.labelKey)}</span>
+                                {link.disabled && <span className={`text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-auto ${!isAppShell && isCollapsed ? 'md:hidden' : 'block'}`}>Soon</span>}
                             </a>
                         </li>
                     ))}

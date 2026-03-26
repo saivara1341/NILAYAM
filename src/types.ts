@@ -350,6 +350,68 @@ export interface OwnerPaymentsDashboard {
     propertyOptions: OwnerPaymentPropertyOption[];
 }
 
+export type InvoiceStatus = 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
+export type ReconciliationStatus = 'matched' | 'unmatched' | 'review_required';
+export type PayoutStatus = 'pending' | 'processing' | 'paid_out' | 'failed';
+
+export interface InvoiceLineItem {
+    id: string;
+    category: ChargeCategory;
+    label: string;
+    amount: number;
+    notes?: string;
+}
+
+export interface InvoiceRecord {
+    id: string;
+    invoice_number: string;
+    tenant_id?: string | null;
+    house_id: string;
+    building_id?: string | null;
+    billing_month: string;
+    issued_on: string;
+    due_date: string;
+    total_amount: number;
+    outstanding_amount: number;
+    status: InvoiceStatus;
+    line_items: InvoiceLineItem[];
+    payment_ids?: string[];
+    notes?: string;
+}
+
+export interface ReconciliationRecord {
+    id: string;
+    payment_id?: string | null;
+    invoice_id?: string | null;
+    detected_amount: number;
+    expected_amount: number;
+    variance_amount: number;
+    status: ReconciliationStatus;
+    channel: 'razorpay' | 'upi' | 'bank_transfer' | 'cash' | 'manual';
+    detected_on: string;
+    notes?: string;
+}
+
+export interface OwnerPayoutRecord {
+    id: string;
+    owner_id?: string | null;
+    building_id?: string | null;
+    payment_id?: string | null;
+    amount: number;
+    payout_status: PayoutStatus;
+    settlement_mode: 'platform_to_owner' | 'direct_owner' | 'manual';
+    destination_label: string;
+    initiated_on: string;
+    completed_on?: string | null;
+    notes?: string;
+}
+
+export interface FinanceERPWorkspace {
+    invoices: InvoiceRecord[];
+    reconciliations: ReconciliationRecord[];
+    payouts: OwnerPayoutRecord[];
+}
+
 export type ChargeCategory =
     | 'rent'
     | 'electricity'
@@ -590,6 +652,91 @@ export interface ServiceProvider {
     description?: string;
     availability: string;
     catalogs?: any[];
+}
+
+export type MaintenancePriority = 'low' | 'medium' | 'high' | 'critical';
+export type WorkOrderStatus = 'unassigned' | 'assigned' | 'en_route' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface VendorWorkOrder {
+    id: string;
+    maintenance_request_id: string;
+    provider_id?: string | null;
+    provider_name?: string | null;
+    provider_phone_number?: string | null;
+    service_category?: string | null;
+    priority: MaintenancePriority;
+    sla_due_at: string;
+    assigned_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    status: WorkOrderStatus;
+    estimated_cost?: number | null;
+    actual_cost?: number | null;
+    notes?: string | null;
+}
+
+export interface MaintenanceERPWorkspace {
+    openRequests: MaintenanceRequest[];
+    workOrders: VendorWorkOrder[];
+    overdueWorkOrders: VendorWorkOrder[];
+}
+
+export type LeadStage =
+    | 'new'
+    | 'contacted'
+    | 'visit_scheduled'
+    | 'visit_completed'
+    | 'negotiation'
+    | 'booking_token'
+    | 'won'
+    | 'lost';
+
+export type LeadSource = 'marketplace' | 'website' | 'referral' | 'walk_in' | 'broker' | 'other';
+
+export interface LeadRecord {
+    id: string;
+    building_id?: string | null;
+    house_id?: string | null;
+    owner_id?: string | null;
+    full_name: string;
+    phone_number: string;
+    email?: string | null;
+    source: LeadSource;
+    stage: LeadStage;
+    interested_in: 'rent' | 'sale';
+    budget?: number | null;
+    move_in_date?: string | null;
+    notes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PropertyVisit {
+    id: string;
+    lead_id: string;
+    building_id?: string | null;
+    house_id?: string | null;
+    scheduled_for: string;
+    status: 'scheduled' | 'completed' | 'cancelled';
+    notes?: string | null;
+}
+
+export interface BookingRecord {
+    id: string;
+    lead_id: string;
+    building_id?: string | null;
+    house_id?: string | null;
+    booking_type: 'token' | 'application' | 'advance';
+    amount: number;
+    status: 'initiated' | 'received' | 'refunded' | 'cancelled';
+    created_at: string;
+    notes?: string | null;
+}
+
+export interface CRMWorkspace {
+    leads: LeadRecord[];
+    visits: PropertyVisit[];
+    bookings: BookingRecord[];
 }
 
 export interface ServiceReview {

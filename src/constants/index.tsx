@@ -146,6 +146,7 @@ export const OWNER_NAV_LINKS = [
   { href: '/reports', labelKey: 'nav.reports', icon: <ClipboardIcon className="w-5 h-5" /> },
   { href: '/marketplace', labelKey: 'nav.marketplace', icon: <StoreIcon className="w-5 h-5" /> },
   { href: '/services', labelKey: 'nav.services', icon: <BriefcaseIcon className="w-5 h-5" /> }, 
+  { href: '/crm', labelKey: 'nav.crm', icon: <TargetIcon className="w-5 h-5" /> },
   { href: '/profile', labelKey: 'nav.settings', icon: <SettingsIcon className="w-5 h-5" /> }, 
 ];
 

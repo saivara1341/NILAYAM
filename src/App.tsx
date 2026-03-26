@@ -37,6 +37,7 @@ const CommunityEventsPage = lazy(() => import('./pages/CommunityEventsPage'));
 const AIHubPage = lazy(() => import('./pages/AIHubPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const LocalServicesPage = lazy(() => import('./pages/LocalServicesPage'));
+const OpportunityBoardPage = lazy(() => import('./pages/OpportunityBoardPage'));
 const SupportBot = lazy(() => import('@/components/ai/SupportBot'));
 
 const LoadingFallback = () => {
@@ -92,6 +93,7 @@ const OwnerLayout = () => {
                                 <Route path="/ai-hub" element={<AIHubPage />} />
                                 <Route path="/reports" element={<ReportsPage />} />
                                 <Route path="/services" element={<LocalServicesPage />} />
+                                <Route path="/crm" element={<OpportunityBoardPage />} />
                                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
                             </Routes>
                         </Suspense>

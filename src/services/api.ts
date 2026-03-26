@@ -12,7 +12,8 @@ import {
     Visitor, Amenity, Poll, ChatMessage, ForecastDataPoint,
     ChargeLedgerEntry, AgreementWorkflow, ReminderRecord, TenantOperationalData, TenantLifecycleData,
     Payment, OwnerPaymentsDashboard, OwnerPaymentFilters, OwnerPaymentPropertyOption, AgreementWorkspaceItem, CommunityEvent, ProductListing,
-    TenantScoreSummary, TenantScoreFactor, TenantLogEntry
+    TenantScoreSummary, TenantScoreFactor, TenantLogEntry, FinanceERPWorkspace, InvoiceRecord, ReconciliationRecord, OwnerPayoutRecord,
+    MaintenanceERPWorkspace, VendorWorkOrder, CRMWorkspace, LeadRecord, PropertyVisit, BookingRecord
 } from '../types';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -34,6 +35,9 @@ const paymentProofsBucket = 'payment-proofs';
 const communityEventsStorageKey = 'nilayam_community_events';
 const feedbackStorageKey = 'nilayam_feedback_entries';
 const productMarketplaceStorageKey = 'nilayam_product_marketplace';
+const financeWorkspaceStorageKey = 'nilayam_finance_workspace';
+const workOrdersStorageKey = 'nilayam_work_orders';
+const crmWorkspaceStorageKey = 'nilayam_crm_workspace';
 const getE2EState = () => {
     if (typeof window === 'undefined') return null;
     return (window as any).__NILAYAM_E2E__ || null;
@@ -430,6 +434,51 @@ const getStoredProductMarketplaceListings = (): ProductListing[] => {
 const setStoredProductMarketplaceListings = (entries: ProductListing[]) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(productMarketplaceStorageKey, JSON.stringify(entries));
+};
+
+const getStoredFinanceWorkspace = (): FinanceERPWorkspace => {
+    if (typeof window === 'undefined') return { invoices: [], reconciliations: [], payouts: [] };
+    try {
+        const raw = localStorage.getItem(financeWorkspaceStorageKey);
+        return raw ? JSON.parse(raw) : { invoices: [], reconciliations: [], payouts: [] };
+    } catch {
+        return { invoices: [], reconciliations: [], payouts: [] };
+    }
+};
+
+const setStoredFinanceWorkspace = (workspace: FinanceERPWorkspace) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(financeWorkspaceStorageKey, JSON.stringify(workspace));
+};
+
+const getStoredWorkOrders = (): VendorWorkOrder[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = localStorage.getItem(workOrdersStorageKey);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+};
+
+const setStoredWorkOrders = (entries: VendorWorkOrder[]) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(workOrdersStorageKey, JSON.stringify(entries));
+};
+
+const getStoredCRMWorkspace = (): CRMWorkspace => {
+    if (typeof window === 'undefined') return { leads: [], visits: [], bookings: [] };
+    try {
+        const raw = localStorage.getItem(crmWorkspaceStorageKey);
+        return raw ? JSON.parse(raw) : { leads: [], visits: [], bookings: [] };
+    } catch {
+        return { leads: [], visits: [], bookings: [] };
+    }
+};
+
+const setStoredCRMWorkspace = (workspace: CRMWorkspace) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(crmWorkspaceStorageKey, JSON.stringify(workspace));
 };
 
 export const lookupTenantScoreByAadhaar = async (aadhaarNumber: string): Promise<number> => {
@@ -1905,6 +1954,110 @@ export const getFinancialsOverview = async (): Promise<{ totalIncome: number, to
     };
 };
 
+const buildFinanceWorkspace = async (): Promise<FinanceERPWorkspace> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const stored = getStoredFinanceWorkspace();
+    const { data: houses, error: houseError } = await supabase
+        .from('houses')
+        .select('id, building_id, house_number, rent_amount, tenant_id, lease_end_date, buildings!inner(id, name, owner_id)')
+        .eq('buildings.owner_id', user.id);
+    if (houseError) throw houseError;
+
+    const { data: paymentRows, error: paymentError } = await supabase
+        .from('payments')
+        .select('id, tenant_id, house_id, amount, payment_type, status, due_date, paid_date, created_at, razorpay_payment_id')
+        .in('house_id', (houses || []).map((house: any) => house.id).length ? (houses || []).map((house: any) => house.id) : ['00000000-0000-0000-0000-000000000000']);
+    if (paymentError && paymentError.code !== 'PGRST116') throw paymentError;
+
+    const existingInvoices = stored.invoices || [];
+    const generatedInvoices: InvoiceRecord[] = (houses || []).flatMap((house: any) => {
+        if (!house.tenant_id) return [];
+        const months = Array.from({ length: 3 }, (_v, index) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - index);
+            return formatBillingMonth(date);
+        });
+
+        return months.map((month) => {
+            const matchingPayment = (paymentRows || []).find((payment: any) => payment.house_id === house.id && formatBillingMonth(payment.due_date || payment.created_at) === month);
+            const baseTotal = Number(matchingPayment?.amount || house.rent_amount || 0);
+            const outstanding = normalizePaymentStatus(matchingPayment?.status) === 'paid' ? 0 : baseTotal;
+            const existing = existingInvoices.find((invoice) => invoice.house_id === house.id && invoice.billing_month === month);
+            return existing || {
+                id: `invoice_${house.id}_${month}`,
+                invoice_number: `INV-${month.replace('-', '')}-${house.house_number}`,
+                tenant_id: house.tenant_id,
+                house_id: house.id,
+                building_id: house.building_id,
+                billing_month: month,
+                issued_on: new Date(`${month}-01`).toISOString(),
+                due_date: new Date(new Date(`${month}-01`).getFullYear(), new Date(`${month}-01`).getMonth(), 5).toISOString(),
+                total_amount: baseTotal,
+                outstanding_amount: outstanding,
+                status: outstanding === 0 ? 'paid' : new Date().toISOString().slice(0, 7) > month ? 'overdue' : 'issued',
+                line_items: [
+                    {
+                        id: `line_${house.id}_${month}`,
+                        category: 'rent',
+                        label: `Monthly rent for Unit ${house.house_number}`,
+                        amount: baseTotal
+                    }
+                ],
+                payment_ids: matchingPayment ? [matchingPayment.id] : [],
+                notes: `Auto-generated invoice for ${house.buildings?.name || 'Property'}`
+            } as InvoiceRecord;
+        });
+    });
+
+    const reconciliations: ReconciliationRecord[] = generatedInvoices.map((invoice) => {
+        const payment = (paymentRows || []).find((entry: any) => invoice.payment_ids?.includes(entry.id));
+        const detected = Number(payment?.amount || 0);
+        const variance = detected - Number(invoice.total_amount || 0);
+        return {
+            id: `reco_${invoice.id}`,
+            payment_id: payment?.id || null,
+            invoice_id: invoice.id,
+            detected_amount: detected,
+            expected_amount: Number(invoice.total_amount || 0),
+            variance_amount: variance,
+            status: payment ? (variance === 0 ? 'matched' : 'review_required') : 'unmatched',
+            channel: payment?.razorpay_payment_id ? 'razorpay' : 'manual',
+            detected_on: payment?.paid_date || payment?.created_at || invoice.issued_on,
+            notes: payment ? 'Matched against recorded payment.' : 'Awaiting settlement or proof verification.'
+        };
+    });
+
+    const payouts: OwnerPayoutRecord[] = (paymentRows || []).filter((payment: any) => normalizePaymentStatus(payment.status) === 'paid').map((payment: any) => ({
+        id: `payout_${payment.id}`,
+        owner_id: user.id,
+        payment_id: payment.id,
+        amount: Number(payment.amount || 0),
+        payout_status: payment.razorpay_payment_id ? 'processing' : 'paid_out',
+        settlement_mode: payment.razorpay_payment_id ? 'platform_to_owner' : 'direct_owner',
+        destination_label: payment.razorpay_payment_id ? 'Owner linked payout / platform transfer' : 'Owner direct collection',
+        initiated_on: payment.created_at || new Date().toISOString(),
+        completed_on: payment.razorpay_payment_id ? null : payment.paid_date || payment.created_at,
+        notes: payment.razorpay_payment_id ? 'Awaiting or assuming linked-account transfer confirmation.' : 'Tenant paid owner directly through manual rail.'
+    }));
+
+    const workspace = {
+        invoices: generatedInvoices,
+        reconciliations,
+        payouts
+    };
+    setStoredFinanceWorkspace(workspace);
+    return workspace;
+};
+
+export const getFinanceERPWorkspace = async (): Promise<FinanceERPWorkspace> => buildFinanceWorkspace();
+
+export const runFinancialReconciliation = async (): Promise<ReconciliationRecord[]> => {
+    const workspace = await buildFinanceWorkspace();
+    return workspace.reconciliations;
+};
+
 export const getRentRollData = async (): Promise<any[]> => {
     const { data, error } = await supabase.from('houses').select('house_number, tenant_name, rent_amount, buildings(name)');
     if (error) throw error;
@@ -1914,6 +2067,125 @@ export const getRentRollData = async (): Promise<any[]> => {
         Tenant: h.tenant_name || 'Vacant',
         Rent: h.rent_amount
     }));
+};
+
+export const getMaintenanceERPWorkspace = async (): Promise<MaintenanceERPWorkspace> => {
+    const requests = await getAllMaintenanceRequests();
+    const providers = await getServiceProviders('All');
+    const storedWorkOrders = getStoredWorkOrders();
+    const workOrders = requests.map((request, index) => {
+        const existing = storedWorkOrders.find((entry) => entry.maintenance_request_id === request.id);
+        if (existing) return existing;
+        const matchingProvider = providers[index % Math.max(providers.length, 1)] || null;
+        const createdAt = new Date(request.created_at);
+        const dueAt = new Date(createdAt.getTime() + (request.status === 'open' ? 24 : 12) * 60 * 60 * 1000);
+        return {
+            id: `wo_${request.id}`,
+            maintenance_request_id: request.id,
+            provider_id: matchingProvider?.id || null,
+            provider_name: matchingProvider?.name || null,
+            provider_phone_number: matchingProvider?.phone_number || null,
+            service_category: matchingProvider?.category || 'General',
+            priority: request.status === 'open' ? 'high' : 'medium',
+            sla_due_at: dueAt.toISOString(),
+            assigned_at: matchingProvider ? createdAt.toISOString() : null,
+            status: matchingProvider ? (request.status === 'open' ? 'assigned' : 'in_progress') : 'unassigned',
+            estimated_cost: matchingProvider ? 1500 + index * 250 : null,
+            actual_cost: null,
+            notes: matchingProvider ? `Auto-assigned to ${matchingProvider.name}.` : 'Awaiting owner dispatch.'
+        } as VendorWorkOrder;
+    });
+    setStoredWorkOrders(workOrders);
+    return {
+        openRequests: requests.filter((request) => request.status !== 'closed' && request.status !== 'resolved'),
+        overdueWorkOrders: workOrders.filter((entry) => new Date(entry.sla_due_at).getTime() < Date.now() && entry.status !== 'completed'),
+        workOrders
+    };
+};
+
+export const updateVendorWorkOrderStatus = async (workOrderId: string, status: VendorWorkOrder['status']): Promise<VendorWorkOrder | null> => {
+    const entries = getStoredWorkOrders();
+    let updated: VendorWorkOrder | null = null;
+    const next = entries.map((entry) => {
+        if (entry.id !== workOrderId) return entry;
+        updated = {
+            ...entry,
+            status,
+            started_at: status === 'in_progress' && !entry.started_at ? new Date().toISOString() : entry.started_at,
+            completed_at: status === 'completed' ? new Date().toISOString() : entry.completed_at
+        };
+        return updated;
+    });
+    setStoredWorkOrders(next);
+    return updated;
+};
+
+export const getCRMWorkspace = async (): Promise<CRMWorkspace> => {
+    const stored = getStoredCRMWorkspace();
+    if (stored.leads.length > 0 || stored.visits.length > 0 || stored.bookings.length > 0) {
+        return stored;
+    }
+
+    const listings = await getMarketplaceListings();
+    const seededLeads: LeadRecord[] = listings.slice(0, 4).map((listing, index) => ({
+        id: `lead_${listing.id}`,
+        building_id: listing.building_id,
+        house_id: null,
+        owner_id: listing.owner_id,
+        full_name: ['Aarav Sharma', 'Saanvi Reddy', 'Rahul Verma', 'Keerthi Nair'][index] || `Lead ${index + 1}`,
+        phone_number: `98765000${index + 1}`,
+        email: null,
+        source: index % 2 === 0 ? 'marketplace' : 'referral',
+        stage: (['new', 'contacted', 'visit_scheduled', 'booking_token'] as const)[index] || 'new',
+        interested_in: listing.listing_type,
+        budget: Number(listing.price || 0),
+        move_in_date: new Date(Date.now() + (index + 7) * 86400000).toISOString(),
+        notes: `Interested in ${listing.building_name}.`,
+        created_at: new Date(Date.now() - index * 86400000).toISOString(),
+        updated_at: new Date().toISOString()
+    }));
+
+    const visits: PropertyVisit[] = seededLeads
+        .filter((lead) => lead.stage === 'visit_scheduled')
+        .map((lead, index) => ({
+            id: `visit_${lead.id}`,
+            lead_id: lead.id,
+            building_id: lead.building_id,
+            house_id: lead.house_id,
+            scheduled_for: new Date(Date.now() + (index + 1) * 86400000).toISOString(),
+            status: 'scheduled',
+            notes: 'Confirm availability and security access before visit.'
+        }));
+
+    const bookings: BookingRecord[] = seededLeads
+        .filter((lead) => lead.stage === 'booking_token')
+        .map((lead) => ({
+            id: `booking_${lead.id}`,
+            lead_id: lead.id,
+            building_id: lead.building_id,
+            house_id: lead.house_id,
+            booking_type: 'token',
+            amount: Math.round(Number(lead.budget || 0) * 0.1),
+            status: 'received',
+            created_at: new Date().toISOString(),
+            notes: 'Booking token received, pending agreement and KYC.'
+        }));
+
+    const workspace = { leads: seededLeads, visits, bookings };
+    setStoredCRMWorkspace(workspace);
+    return workspace;
+};
+
+export const updateLeadStage = async (leadId: string, stage: LeadRecord['stage']): Promise<LeadRecord | null> => {
+    const workspace = getStoredCRMWorkspace();
+    let updated: LeadRecord | null = null;
+    const leads = workspace.leads.map((lead) => {
+        if (lead.id !== leadId) return lead;
+        updated = { ...lead, stage, updated_at: new Date().toISOString() };
+        return updated;
+    });
+    setStoredCRMWorkspace({ ...workspace, leads });
+    return updated;
 };
 
 // --- Maintenance ---

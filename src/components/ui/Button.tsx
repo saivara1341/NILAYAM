@@ -32,6 +32,14 @@ const StyledButton = styled('button', {
   position: 'relative',
   overflow: 'hidden',
   outline: 'none',
+  minHeight: '44px',
+  letterSpacing: '0.01em',
+  boxShadow: '0 10px 25px rgba(15, 23, 42, 0.08)',
+
+  '&:focus-visible': {
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.18), 0 10px 25px rgba(15, 23, 42, 0.12)',
+    transform: 'translateY(-1px)',
+  },
 
   '&:active': {
     transform: 'scale(0.96)',
@@ -48,36 +56,38 @@ const StyledButton = styled('button', {
       primary: {
         background: 'linear-gradient(135deg, $primary, $primaryDark)',
         color: 'white',
-        boxShadow: '$lg',
+        boxShadow: '0 14px 30px rgba(37, 99, 235, 0.22)',
         '&:hover': {
-          boxShadow: '$premium',
+          boxShadow: '0 18px 40px rgba(37, 99, 235, 0.28)',
           transform: 'translateY(-2px)',
           background: 'linear-gradient(135deg, $primaryLight, $primary)',
         },
       },
       secondary: {
-        backgroundColor: '$secondary',
+        background: 'linear-gradient(135deg, #0f172a, #1e293b)',
         color: 'white',
-        border: '1px solid $border',
+        border: '1px solid rgba(15, 23, 42, 0.16)',
+        boxShadow: '0 12px 28px rgba(15, 23, 42, 0.16)',
         '&:hover': {
-          backgroundColor: '#1e293b',
+          background: 'linear-gradient(135deg, #111827, #334155)',
           transform: 'translateY(-1px)',
         },
       },
       outline: {
-        backgroundColor: 'transparent',
-        border: '1px solid $border',
+        backgroundColor: 'rgba(255,255,255,0.76)',
+        border: '1px solid rgba(148, 163, 184, 0.3)',
         color: '$text',
         '&:hover': {
-          backgroundColor: '$glass',
+          backgroundColor: 'rgba(255,255,255,0.92)',
           borderColor: '$primary',
+          transform: 'translateY(-1px)',
         },
       },
       ghost: {
         backgroundColor: 'transparent',
         color: '$textMuted',
         '&:hover': {
-          backgroundColor: '$glass',
+          backgroundColor: 'rgba(148, 163, 184, 0.12)',
           color: '$text',
         },
       },
@@ -99,6 +109,7 @@ const StyledButton = styled('button', {
       sm: {
         padding: '$2 $4',
         fontSize: '$xs',
+        minHeight: '38px',
       },
       md: {
         padding: '$3 $6',
@@ -107,6 +118,7 @@ const StyledButton = styled('button', {
       lg: {
         padding: '$4 $8',
         fontSize: '$base',
+        minHeight: '52px',
       },
     },
     fullWidth: {

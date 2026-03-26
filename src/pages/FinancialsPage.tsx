@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Transaction, TransactionType, FinancialDataPoint } from '../types';
+import { Transaction, TransactionType, FinancialDataPoint, FinanceERPWorkspace } from '../types';
 import Card from '../components/ui/Card';
-import { getTransactions, getFinancialsOverview, getMonthlyFinancialsForInsights } from '../services/api';
+import { getTransactions, getFinancialsOverview, getMonthlyFinancialsForInsights, getFinanceERPWorkspace, runFinancialReconciliation } from '../services/api';
 import PaginationControls from '../components/ui/PaginationControls';
 import Spinner from '../components/ui/Spinner';
 import ProfitLossChart from '../components/insights/ProfitLossChart';
@@ -59,6 +59,7 @@ const FinancialsPage: React.FC = () => {
 
     const [filters, setFilters] = useState<{ type?: TransactionType; startDate?: string; endDate?: string }>({});
     const [sort, setSort] = useState<{ by: 'date' | 'amount'; order: 'asc' | 'desc' }>({ by: 'date', order: 'desc' });
+    const [erpWorkspace, setErpWorkspace] = useState<FinanceERPWorkspace | null>(null);
 
     // Insights State
     const [showPLTrend, setShowPLTrend] = useState(false);
@@ -91,6 +92,15 @@ const FinancialsPage: React.FC = () => {
         }
     }, [currentPage, filters, sort]);
 
+    const fetchFinanceWorkspace = useCallback(async () => {
+        try {
+            const workspace = await getFinanceERPWorkspace();
+            setErpWorkspace(workspace);
+        } catch (err) {
+            console.error(err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchSummary();
     }, [fetchSummary]);
@@ -99,8 +109,16 @@ const FinancialsPage: React.FC = () => {
         fetchTransactions();
     }, [fetchTransactions]);
 
-    const handleReconcile = () => {
-        toastSuccess("Successfully reconciled 50 new UPI transactions and 12 bank transfers.");
+    useEffect(() => {
+        void fetchFinanceWorkspace();
+    }, [fetchFinanceWorkspace]);
+
+    const handleReconcile = async () => {
+        const records = await runFinancialReconciliation();
+        setErpWorkspace((current) => current ? { ...current, reconciliations: records } : current);
+        const matched = records.filter((record) => record.status === 'matched').length;
+        const review = records.filter((record) => record.status === 'review_required').length;
+        toastSuccess(`Reconciliation finished: ${matched} matched, ${review} need review.`);
     };
 
     const handleExport = (format: 'csv' | 'pdf') => {
@@ -152,6 +170,18 @@ const FinancialsPage: React.FC = () => {
     };
 
     const totalPages = Math.ceil(totalTransactions / ITEMS_PER_PAGE);
+    const invoiceTotals = erpWorkspace?.invoices.reduce((acc, invoice) => {
+        acc.total += invoice.total_amount;
+        acc.outstanding += invoice.outstanding_amount;
+        if (invoice.status === 'overdue') acc.overdue += invoice.outstanding_amount;
+        return acc;
+    }, { total: 0, outstanding: 0, overdue: 0 }) || { total: 0, outstanding: 0, overdue: 0 };
+    const payoutTotals = erpWorkspace?.payouts.reduce((acc, payout) => {
+        if (payout.payout_status === 'paid_out') acc.completed += payout.amount;
+        else acc.pending += payout.amount;
+        return acc;
+    }, { completed: 0, pending: 0 }) || { completed: 0, pending: 0 };
+    const reviewCount = erpWorkspace?.reconciliations.filter((record) => record.status === 'review_required').length || 0;
 
     return (
         <div className="space-y-6 animate-fade-in pb-20 md:pb-0 print:p-0 print:space-y-4">
@@ -182,6 +212,29 @@ const FinancialsPage: React.FC = () => {
                 <Card className="bg-gradient-to-br from-green-50 to-white dark:from-neutral-800 dark:to-neutral-900 print:border print:border-neutral-300">
                     <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">{t('financials.net_profit')}</p>
                     <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">₹{summary.netProfit.toLocaleString('en-IN')}</p>
+                </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+                <Card className="bg-gradient-to-br from-violet-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Invoices Issued</p>
+                    <p className="mt-2 text-3xl font-bold text-violet-600 dark:text-violet-400">₹{invoiceTotals.total.toLocaleString('en-IN')}</p>
+                    <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">{erpWorkspace?.invoices.length || 0} invoices in billing engine</p>
+                </Card>
+                <Card className="bg-gradient-to-br from-amber-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Outstanding Ledger</p>
+                    <p className="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-400">₹{invoiceTotals.outstanding.toLocaleString('en-IN')}</p>
+                    <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Overdue: ₹{invoiceTotals.overdue.toLocaleString('en-IN')}</p>
+                </Card>
+                <Card className="bg-gradient-to-br from-sky-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Reconciliation</p>
+                    <p className="mt-2 text-3xl font-bold text-sky-600 dark:text-sky-400">{reviewCount}</p>
+                    <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Entries need owner finance review</p>
+                </Card>
+                <Card className="bg-gradient-to-br from-emerald-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Owner Settlement</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{payoutTotals.completed.toLocaleString('en-IN')}</p>
+                    <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Pending payout review: ₹{payoutTotals.pending.toLocaleString('en-IN')}</p>
                 </Card>
             </div>
 
@@ -225,6 +278,73 @@ const FinancialsPage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <Card>
+                    <div className="flex items-center justify-between gap-4 mb-5">
+                        <div>
+                            <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200">Invoice & Ledger ERP</h3>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Recurring rent invoices, outstanding balance, and invoice-to-payment linkage.</p>
+                        </div>
+                        <FileTextIcon className="w-5 h-5 text-violet-600" />
+                    </div>
+                    <div className="space-y-3">
+                        {(erpWorkspace?.invoices || []).slice(0, 6).map((invoice) => (
+                            <div key={invoice.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/50 px-4 py-4">
+                                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold text-neutral-900 dark:text-white">{invoice.invoice_number}</p>
+                                        <p className="text-xs text-neutral-500 dark:text-neutral-400">{invoice.billing_month} • Due {new Date(invoice.due_date).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                        invoice.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                        invoice.status === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                    }`}>
+                                        {invoice.status.replace('_', ' ')}
+                                    </span>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                                    <span className="font-semibold text-neutral-900 dark:text-white">Total: ₹{invoice.total_amount.toLocaleString('en-IN')}</span>
+                                    <span className="text-neutral-500 dark:text-neutral-400">Outstanding: ₹{invoice.outstanding_amount.toLocaleString('en-IN')}</span>
+                                    <span className="text-neutral-500 dark:text-neutral-400">{invoice.line_items.length} line item(s)</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+
+                <Card>
+                    <div className="flex items-center justify-between gap-4 mb-5">
+                        <div>
+                            <h3 className="text-xl font-bold text-neutral-800 dark:text-neutral-200">Reconciliation & Payout Control</h3>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Match tenant collections against invoices and review owner settlement state.</p>
+                        </div>
+                        <InsightsIcon className="w-5 h-5 text-sky-600" />
+                    </div>
+                    <div className="space-y-3">
+                        {(erpWorkspace?.reconciliations || []).slice(0, 4).map((record) => (
+                            <div key={record.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-700 px-4 py-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="text-sm font-bold text-neutral-900 dark:text-white">{record.invoice_id || 'Unlinked payment'}</p>
+                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                        record.status === 'matched' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                        record.status === 'review_required' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                                        'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                    }`}>
+                                        {record.status.replace('_', ' ')}
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Expected ₹{record.expected_amount.toLocaleString('en-IN')} • Detected ₹{record.detected_amount.toLocaleString('en-IN')} • Variance ₹{record.variance_amount.toLocaleString('en-IN')}</p>
+                            </div>
+                        ))}
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Owner-direct settlement design</p>
+                            <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">Manual UPI and bank transfer settlements already go directly to the owner. Standard Razorpay collections must be routed through linked-account payout flows before you mark them as owner-direct online settlements.</p>
+                        </div>
+                    </div>
+                </Card>
+            </div>
 
             <Card className="p-4 md:p-6 print:shadow-none print:border-0">
                 <h3 className="text-xl font-bold mb-6 text-neutral-800 dark:text-neutral-200">{t('financials.history')}</h3>

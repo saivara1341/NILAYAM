@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Link } from 'react-router-dom';
 import ThemeToggle from '@/components/ui/ThemeToggle';
-import { BellIcon, LogoIcon, SearchIcon, MessageCircleIcon, ZapIcon, Menu3ArrowsIcon, TranslateIcon } from '@/constants';
+import { BellIcon, LogoIcon, SearchIcon, ZapIcon, Menu3ArrowsIcon } from '@/constants';
 import Button from '@/components/ui/Button';
 import { UserRole, AppNotification, TaskJob } from '@/types';
 import { getNotifications } from '@/services/api';
@@ -49,6 +49,14 @@ const ActivityIndicator: React.FC = () => {
         </div>
     );
 }
+
+const getInitials = (value?: string | null) =>
+    (value || 'U')
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() || '')
+        .join('') || 'U';
 
 interface HeaderProps {
     isCollapsed: boolean;
@@ -97,6 +105,8 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
   };
 
   const isTranslated = language !== 'en';
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Workspace';
+  const workspaceLabel = profile?.role === UserRole.Tenant ? 'Tenant workspace' : 'Owner workspace';
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md pt-safe border-b border-neutral-200/50 dark:border-neutral-800/50 transition-all duration-300 relative">
@@ -130,7 +140,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
                     </div>
                     <input
                         type="text"
-                        placeholder="Search portfolio..."
+                        placeholder={profile?.role === UserRole.Tenant ? 'Search agreement, payments, services...' : 'Search portfolio, tenants, payments...'}
                         className="w-full pl-9 pr-4 py-2.5 bg-neutral-100/80 dark:bg-neutral-800/80 border-transparent rounded-2xl focus:ring-2 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-neutral-900 text-sm text-neutral-800 dark:text-neutral-200 transition-all shadow-inner"
                     />
                 </div>
@@ -195,6 +205,20 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed, setIsCollapsed, isMobileOp
                     </div>
                 )}
             </div>
+
+            <Link to="/profile" className="hidden min-w-0 items-center gap-3 rounded-2xl border border-neutral-200/60 bg-white px-3 py-2 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60 dark:border-neutral-700/60 dark:bg-neutral-800/80 dark:hover:border-blue-900/40 dark:hover:bg-neutral-800 md:flex">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb,#0f172a)] text-xs font-black text-white">
+                    {getInitials(displayName)}
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-neutral-900 dark:text-white">{displayName}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">{workspaceLabel}</p>
+                </div>
+            </Link>
+
+            <Link to="/profile" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-neutral-200/50 bg-white text-xs font-black text-neutral-900 shadow-sm transition hover:border-blue-200 hover:text-blue-600 dark:border-neutral-700/50 dark:bg-neutral-800 dark:text-white md:hidden">
+                {getInitials(displayName)}
+            </Link>
 
             <div className="rounded-xl border border-neutral-200/50 bg-neutral-50 p-1 dark:border-neutral-700/50 dark:bg-neutral-800">
                 <ThemeToggle />

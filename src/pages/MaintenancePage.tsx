@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { MaintenanceRequest, MaintenanceStatus } from '../types';
+import { MaintenanceRequest, MaintenanceStatus, MaintenanceERPWorkspace, VendorWorkOrder } from '../types';
 import Card from '../components/ui/Card';
-import { getMaintenanceRequests } from '../services/api';
+import { getMaintenanceRequests, getMaintenanceERPWorkspace, updateVendorWorkOrderStatus } from '../services/api';
 import PaginationControls from '../components/ui/PaginationControls';
 import Spinner from '../components/ui/Spinner';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -53,6 +53,8 @@ const MaintenancePage: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalRequests, setTotalRequests] = useState(0);
     const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | undefined>(undefined);
+    const [workspace, setWorkspace] = useState<MaintenanceERPWorkspace | null>(null);
+    const [updatingWorkOrder, setUpdatingWorkOrder] = useState<string | null>(null);
 
     const fetchRequests = useCallback(async (page: number, status?: MaintenanceStatus) => {
         setLoading(true);
@@ -77,12 +79,39 @@ const MaintenancePage: React.FC = () => {
         fetchRequests(currentPage, statusFilter);
     }, [currentPage, statusFilter, fetchRequests]);
 
+    useEffect(() => {
+        const loadWorkspace = async () => {
+            try {
+                const data = await getMaintenanceERPWorkspace();
+                setWorkspace(data);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        void loadWorkspace();
+    }, [requests.length]);
+
     const handleFilterChange = (status?: MaintenanceStatus) => {
         setStatusFilter(status);
         setCurrentPage(1);
     }
 
     const totalPages = Math.ceil(totalRequests / ITEMS_PER_PAGE);
+
+    const handleWorkOrderUpdate = async (id: string, status: VendorWorkOrder['status']) => {
+        setUpdatingWorkOrder(id);
+        try {
+            const updated = await updateVendorWorkOrderStatus(id, status);
+            if (!updated) return;
+            setWorkspace((current) => current ? {
+                ...current,
+                workOrders: current.workOrders.map((entry) => entry.id === id ? updated : entry),
+                overdueWorkOrders: current.overdueWorkOrders.filter((entry) => entry.id !== id || updated.status !== 'completed')
+            } : current);
+        } finally {
+            setUpdatingWorkOrder(null);
+        }
+    };
 
     if (dbError) {
         return (
@@ -133,6 +162,64 @@ const MaintenancePage: React.FC = () => {
     return (
         <div className="space-y-6 animate-fade-in">
             <h2 className="text-3xl font-bold text-blue-900 dark:text-slate-200">{t('maintenance.title')}</h2>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Card className="bg-gradient-to-br from-orange-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Open Requests</p>
+                    <p className="mt-2 text-3xl font-bold text-orange-600 dark:text-orange-400">{workspace?.openRequests.length || 0}</p>
+                </Card>
+                <Card className="bg-gradient-to-br from-red-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">SLA At Risk</p>
+                    <p className="mt-2 text-3xl font-bold text-red-600 dark:text-red-400">{workspace?.overdueWorkOrders.length || 0}</p>
+                </Card>
+                <Card className="bg-gradient-to-br from-emerald-50 to-white dark:from-neutral-800 dark:to-neutral-900">
+                    <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Vendor Work Orders</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-400">{workspace?.workOrders.length || 0}</p>
+                </Card>
+            </div>
+
+            {workspace && (
+                <Card>
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-neutral-900 dark:text-white">SLA & Vendor Dispatch Desk</h3>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Assign providers, track service SLAs, and push work orders from intake to completion.</p>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        {workspace.workOrders.slice(0, 6).map((workOrder) => (
+                            <div key={workOrder.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/50 px-4 py-4">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold text-neutral-900 dark:text-white">{workOrder.provider_name || 'Awaiting assignment'} • {workOrder.service_category || 'General'}</p>
+                                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">SLA due {new Date(workOrder.sla_due_at).toLocaleString()} • Priority {workOrder.priority}</p>
+                                        <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{workOrder.notes || 'No operational notes yet.'}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                            workOrder.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                            new Date(workOrder.sla_due_at).getTime() < Date.now() ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                        }`}>
+                                            {workOrder.status.replace('_', ' ')}
+                                        </span>
+                                        {workOrder.status !== 'in_progress' && workOrder.status !== 'completed' && (
+                                            <button onClick={() => void handleWorkOrderUpdate(workOrder.id, 'in_progress')} disabled={updatingWorkOrder === workOrder.id} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white">
+                                                Start
+                                            </button>
+                                        )}
+                                        {workOrder.status !== 'completed' && (
+                                            <button onClick={() => void handleWorkOrderUpdate(workOrder.id, 'completed')} disabled={updatingWorkOrder === workOrder.id} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
+                                                Close SLA
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
 
             <Card>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">

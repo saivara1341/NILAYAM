@@ -22,6 +22,8 @@ import MobileBottomNav from '@/components/layout/MobileBottomNav';
 const RoleSelectionPage = lazy(() => import('./pages/RoleSelectionPage'));
 const PropertiesPage = lazy(() => import('./pages/PropertiesPage'));
 const TenantsPage = lazy(() => import('./pages/TenantsPage'));
+const AgreementsPage = lazy(() => import('./pages/AgreementsPage'));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage'));
 const FinancialsPage = lazy(() => import('./pages/FinancialsPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));
@@ -31,6 +33,7 @@ const TenantDetailPage = lazy(() => import('./pages/TenantDetailPage'));
 const TenantFeedbackPage = lazy(() => import('./pages/TenantFeedbackPage'));
 const TenantMaintenancePage = lazy(() => import('./pages/TenantMaintenancePage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
+const CommunityEventsPage = lazy(() => import('./pages/CommunityEventsPage'));
 const AIHubPage = lazy(() => import('./pages/AIHubPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const LocalServicesPage = lazy(() => import('./pages/LocalServicesPage'));
@@ -65,11 +68,11 @@ const OwnerLayout = () => {
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
+        <div className="ornate-shell flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
             <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
             <div className="flex flex-1 overflow-hidden">
                 <Sidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-                <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
+                <main className="ornate-surface flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
                     <ErrorBoundary>
                         <Suspense fallback={<Spinner />}>
                             <Routes>
@@ -77,12 +80,15 @@ const OwnerLayout = () => {
                                 <Route path="/properties" element={<PropertiesPage />} />
                                 <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
                                 <Route path="/tenants" element={<TenantsPage />} />
+                                <Route path="/agreements" element={<AgreementsPage />} />
+                                <Route path="/payments" element={<PaymentsPage />} />
                                 <Route path="/financials" element={<FinancialsPage />} />
                                 <Route path="/maintenance" element={<MaintenancePage />} />
                                 <Route path="/announcements" element={<AnnouncementsPage />} />
                                 <Route path="/marketplace" element={<MarketplacePage />} />
                                 <Route path="/profile" element={<ProfilePage />} />
                                 <Route path="/community" element={<CommunityPage />} />
+                                <Route path="/community-events" element={<CommunityEventsPage />} />
                                 <Route path="/ai-hub" element={<AIHubPage />} />
                                 <Route path="/reports" element={<ReportsPage />} />
                                 <Route path="/services" element={<LocalServicesPage />} />
@@ -105,18 +111,21 @@ const TenantLayout = () => {
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
+        <div className="ornate-shell flex flex-col h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950 pt-safe">
             <Header isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
             <div className="flex flex-1 overflow-hidden">
                 <TenantSidebar isCollapsed={isCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-                <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
+                <main className="ornate-surface flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-[env(safe-area-inset-bottom,2rem)] md:pb-8">
                     <ErrorBoundary>
                         <Suspense fallback={<Spinner />}>
                             <Routes>
                                 <Route path="/tenant-dashboard" element={<TenantDashboard />} />
+                                <Route path="/community" element={<CommunityPage />} />
+                                <Route path="/agreements" element={<AgreementsPage />} />
                                 <Route path="/feedback" element={<TenantFeedbackPage />} />
                                 <Route path="/tenant-maintenance" element={<TenantMaintenancePage />} />
                                 <Route path="/services" element={<LocalServicesPage />} />
+                                <Route path="/community-events" element={<CommunityEventsPage />} />
                                 <Route path="/profile" element={<ProfilePage />} />
                                 <Route path="/marketplace" element={<MarketplacePage />} />
                                 <Route path="*" element={<Navigate to="/tenant-dashboard" replace />} />
@@ -137,8 +146,6 @@ const App: React.FC = () => {
     const { session, profile, effectiveRole, loading, signOut } = useAuth();
     const pendingRoleSetup = hasPendingRoleSetup();
     const tenantIdentityReady = hasTenantIdentity(profile, session);
-
-    console.log("APP.TSX: Rendering state:", { loading, hasSession: !!session, hasProfile: !!profile, role: effectiveRole });
 
     React.useEffect(() => {
         if (effectiveRole) {
@@ -166,7 +173,6 @@ const App: React.FC = () => {
     }, [effectiveRole, loading, pendingRoleSetup, session, signOut]);
 
     if (loading) {
-        console.log("APP.TSX: Showing LoadingFallback");
         return <LoadingFallback />;
     }
 

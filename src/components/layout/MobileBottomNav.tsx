@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { HomeIcon, PropertiesIcon, UsersIcon, WrenchIcon, ShoppingBagIcon } from '@/constants';
+import { HomeIcon, PropertiesIcon, WrenchIcon, LeaseIcon } from '@/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types';
@@ -24,13 +24,13 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick }) => {
     const ownerNavItems = [
         { to: '/dashboard', labelKey: 'nav.home', icon: <HomeIcon className="w-6 h-6" /> },
         { to: '/properties', labelKey: 'nav.properties', icon: <PropertiesIcon className="w-6 h-6" /> },
-        { to: '/community', labelKey: 'nav.community', icon: <UsersIcon className="w-6 h-6" /> },
+        { to: '/agreements', labelKey: 'nav.agreements', icon: <LeaseIcon className="w-6 h-6" /> },
     ];
 
     const tenantNavItems = [
         { to: '/tenant-dashboard', labelKey: 'nav.home', icon: <HomeIcon className="w-6 h-6" /> },
+        { to: '/agreements', labelKey: 'nav.agreements', icon: <LeaseIcon className="w-6 h-6" /> },
         { to: '/tenant-maintenance', labelKey: 'nav.maintenance', icon: <WrenchIcon className="w-6 h-6" /> },
-        { to: '/marketplace', labelKey: 'nav.marketplace', icon: <ShoppingBagIcon className="w-6 h-6" /> },
     ];
 
     const navItems = effectiveRole === UserRole.Tenant ? tenantNavItems : ownerNavItems;

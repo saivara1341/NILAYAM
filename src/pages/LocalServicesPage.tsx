@@ -59,12 +59,13 @@ const ReviewModal: React.FC<{ isOpen: boolean, onClose: () => void, providerId: 
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const { success, error } = useToast();
+    const { profile } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await addServiceReview(providerId, rating, comment, 'Anonymous Owner'); 
+            await addServiceReview(providerId, rating, comment, profile?.full_name || 'Nilayam User'); 
             success("Review submitted!");
             onSuccess();
             onClose();
@@ -108,6 +109,8 @@ const LocalServicesPage: React.FC = () => {
     const [providers, setProviders] = useState<ServiceProvider[]>([]);
     const [loading, setLoading] = useState(true);
     const [category, setCategory] = useState<ServiceCategory | 'All' | string>('All');
+    const [search, setSearch] = useState('');
+    const [verifiedOnly, setVerifiedOnly] = useState(false);
     
     // Registration State
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -137,6 +140,19 @@ const LocalServicesPage: React.FC = () => {
     useEffect(() => {
         fetchProviders();
     }, [category]);
+
+    const filteredProviders = providers.filter((provider) => {
+        const matchesSearch = !search.trim() || [provider.name, provider.category, provider.location, provider.description]
+            .some((value) => String(value || '').toLowerCase().includes(search.trim().toLowerCase()));
+        const matchesVerified = !verifiedOnly || provider.is_verified;
+        return matchesSearch && matchesVerified;
+    });
+
+    const stats = {
+        total: providers.length,
+        verified: providers.filter((provider) => provider.is_verified).length,
+        available: providers.filter((provider) => (provider.availability || '').toLowerCase().includes('available')).length
+    };
 
     const handleWhatsApp = (provider: ServiceProvider) => {
         const message = `Hi ${provider.name}, I saw your profile on Nilayam. I need help with ${provider.category} services.`;
@@ -200,6 +216,39 @@ const LocalServicesPage: React.FC = () => {
                 </button>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-[1.5rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Pros Listed</p>
+                    <p className="mt-2 text-3xl font-black text-neutral-900 dark:text-white">{stats.total}</p>
+                </div>
+                <div className="rounded-[1.5rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Verified</p>
+                    <p className="mt-2 text-3xl font-black text-emerald-600 dark:text-emerald-400">{stats.verified}</p>
+                </div>
+                <div className="rounded-[1.5rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Available Now</p>
+                    <p className="mt-2 text-3xl font-black text-blue-600 dark:text-blue-400">{stats.available}</p>
+                </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+                    <div className="relative">
+                        <SearchIcon className="absolute left-4 top-3.5 h-4 w-4 text-neutral-400" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search pros by name, skill, service area, or specialty"
+                            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-3 pl-11 pr-4 text-sm text-neutral-900 outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+                        />
+                    </div>
+                    <label className="inline-flex items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 dark:border-neutral-700 dark:text-neutral-200">
+                        <input type="checkbox" checked={verifiedOnly} onChange={e => setVerifiedOnly(e.target.checked)} className="h-4 w-4 rounded border-neutral-300 text-blue-600" />
+                        Verified only
+                    </label>
+                </div>
+            </div>
+
             {/* Filter Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {CATEGORIES.map(cat => (
@@ -223,7 +272,7 @@ const LocalServicesPage: React.FC = () => {
                 <div className="h-64 flex items-center justify-center"><Spinner /></div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {providers.map(provider => (
+                    {filteredProviders.map(provider => (
                         <div key={provider.id}>
                             <ServiceProviderCard 
                                 provider={provider} 
@@ -250,9 +299,9 @@ const LocalServicesPage: React.FC = () => {
                             </div>
                         </div>
                     ))}
-                    {providers.length === 0 && (
+                    {filteredProviders.length === 0 && (
                         <div className="col-span-full text-center py-12 text-neutral-500">
-                            No service providers found in this category yet.
+                            No service providers matched the current search and trust filters.
                         </div>
                     )}
                 </div>

@@ -2,78 +2,151 @@ import React, { useState } from 'react';
 import { supabase } from '../../services/supabase';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { isRazorpayRuntimeAvailable } from '../../services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface RazorpayButtonProps {
     amount: number;
     paymentType: 'rent' | 'maintenance' | 'security_deposit' | 'subscription';
     houseId?: string;
     tenantId: string;
-    onSuccess?: () => void;
+    paymentId?: string;
+    onSuccess?: () => void | Promise<void>;
     buttonText?: string;
     className?: string;
     disabledReason?: string;
 }
+
+const loadRazorpayCheckout = async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+    if ((window as any).Razorpay) return true;
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout="true"]');
+    if (existingScript) {
+        await new Promise((resolve) => {
+            if ((window as any).Razorpay) {
+                resolve(true);
+                return;
+            }
+            existingScript.addEventListener('load', () => resolve(true), { once: true });
+            existingScript.addEventListener('error', () => resolve(false), { once: true });
+        });
+        return Boolean((window as any).Razorpay);
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.dataset.razorpayCheckout = 'true';
+
+    const loaded = await new Promise<boolean>((resolve) => {
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
+
+    return loaded && Boolean((window as any).Razorpay);
+};
 
 export function RazorpayButton({
     amount,
     paymentType,
     houseId,
     tenantId,
+    paymentId,
     onSuccess,
     buttonText = 'Pay Now',
     className = '',
     disabledReason
 }: RazorpayButtonProps) {
     const [loading, setLoading] = useState(false);
+    const { profile, user } = useAuth();
     const apiBaseUrl = (import.meta as any).env.VITE_API_BASE_URL?.replace(/\/$/, '') || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? window.location.origin : '');
-    const isAvailable = isRazorpayRuntimeAvailable() && Boolean((window as any).Razorpay);
+    const buildApiUrl = (path: string) => `${apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`}${path}`;
+    const isAvailable = isRazorpayRuntimeAvailable();
 
     const handlePayment = async () => {
         if (!isAvailable) {
             alert(disabledReason || 'Razorpay is not configured for this deployment yet.');
             return;
         }
+
+        if (!tenantId || !Number.isFinite(amount) || amount <= 0) {
+            alert('This payment is not ready yet. Please refresh and try again.');
+            return;
+        }
+
         setLoading(true);
+        let trackedPaymentId: string | null = null;
         try {
-            // 1. Create a placeholder record in Supabase to track this attempt
-            const { data: pendingPayment, error: dbError } = await supabase
-                .from('payments')
-                .insert({
-                    tenant_id: tenantId,
-                    house_id: houseId,
-                    amount: amount,
-                    payment_type: paymentType,
-                    status: 'pending'
-                })
-                .select()
-                .single();
+            const razorpayLoaded = await loadRazorpayCheckout();
+            if (!razorpayLoaded) {
+                throw new Error('Razorpay checkout failed to load in this runtime.');
+            }
 
-            if (dbError) throw dbError;
+            let pendingPaymentId = paymentId && !paymentId.startsWith('rent_due_') ? paymentId : null;
 
-            // 2. Create the Razorpay Order via our secure Express backend (Unified URL)
-            const orderResponse = await fetch(`${apiBaseUrl}/api/create-order`, {
+            if (pendingPaymentId) {
+                const { error: updatePendingError } = await supabase
+                    .from('payments')
+                    .update({
+                        tenant_id: tenantId,
+                        house_id: houseId,
+                        amount,
+                        payment_type: paymentType,
+                        status: 'pending',
+                        paid_date: null
+                    })
+                    .eq('id', pendingPaymentId);
+
+                if (updatePendingError) throw updatePendingError;
+            } else {
+                const { data: pendingPayment, error: dbError } = await supabase
+                    .from('payments')
+                    .insert({
+                        tenant_id: tenantId,
+                        house_id: houseId,
+                        amount,
+                        payment_type: paymentType,
+                        status: 'pending',
+                        due_date: new Date().toISOString()
+                    })
+                    .select('id')
+                    .single();
+
+                if (dbError) throw dbError;
+                pendingPaymentId = pendingPayment.id;
+            }
+
+            trackedPaymentId = pendingPaymentId;
+
+            const orderResponse = await fetch(buildApiUrl('/create-order'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    amount, // Backend multiplies by 100 for paise
+                    amount,
                     currency: 'INR',
-                    receipt: `rcpt_${pendingPayment.id}`,
+                    receipt: `rcpt_${pendingPaymentId}`,
+                    notes: {
+                        tenantId,
+                        houseId: houseId || '',
+                        paymentType,
+                        paymentId: pendingPaymentId
+                    }
                 })
             });
 
             if (!orderResponse.ok) {
-                throw new Error('Failed to create Razorpay Order securely');
+                const errorPayload = await orderResponse.json().catch(() => null);
+                throw new Error(errorPayload?.error || 'Failed to create Razorpay order securely');
             }
 
             const orderData = await orderResponse.json();
 
-            // Update the pending payment with the Razorpay Order ID
             await supabase
                 .from('payments')
                 .update({ razorpay_order_id: orderData.id })
-                .eq('id', pendingPayment.id);
+                .eq('id', pendingPaymentId);
 
-            // 3. Initialize Razorpay Checkout
             const options = {
                 key: (import.meta as any).env.VITE_RAZORPAY_KEY_ID || '',
                 amount: orderData.amount,
@@ -83,8 +156,7 @@ export function RazorpayButton({
                 order_id: orderData.id,
                 handler: async (response: any) => {
                     try {
-                        // 4. Verify the payment signature on our secure backend
-                        const verifyResponse = await fetch(`${apiBaseUrl}/api/verify-payment`, {
+                        const verifyResponse = await fetch(buildApiUrl('/verify-payment'), {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -97,17 +169,17 @@ export function RazorpayButton({
                         const verifyResult = await verifyResponse.json();
 
                         if (verifyResult.success) {
-                            // 5. If successful, definitively mark the payment as completed in Supabase
                             await supabase
                                 .from('payments')
                                 .update({
                                     status: 'completed',
+                                    paid_date: new Date().toISOString(),
                                     razorpay_payment_id: response.razorpay_payment_id,
                                     razorpay_signature: response.razorpay_signature
                                 })
-                                .eq('id', pendingPayment.id);
+                                .eq('id', pendingPaymentId);
 
-                            if (onSuccess) onSuccess();
+                            if (onSuccess) await onSuccess();
                             alert('Payment successful!');
                         } else {
                             throw new Error('Payment signature verification failed.');
@@ -118,7 +190,7 @@ export function RazorpayButton({
                         await supabase
                             .from('payments')
                             .update({ status: 'failed' })
-                            .eq('id', pendingPayment.id);
+                            .eq('id', pendingPaymentId);
 
                         alert('Payment verification failed.');
                     } finally {
@@ -126,12 +198,12 @@ export function RazorpayButton({
                     }
                 },
                 prefill: {
-                    name: "Tenant Name", // In a real app, populate from user profile
-                    email: "tenant@example.com",
-                    contact: "9999999999"
+                    name: profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Nilayam User',
+                    email: user?.email || '',
+                    contact: profile?.phone_number || (user?.user_metadata?.phone_number as string | undefined) || ''
                 },
                 theme: {
-                    color: "#1d4ed8" // Matches Nilayam primary color
+                    color: '#1d4ed8'
                 }
             };
 
@@ -142,16 +214,23 @@ export function RazorpayButton({
                 await supabase
                     .from('payments')
                     .update({ status: 'failed' })
-                    .eq('id', pendingPayment.id);
+                    .eq('id', pendingPaymentId);
 
                 setLoading(false);
+                alert(response.error.description || 'Payment failed. Please try again.');
             });
 
             rzp.open();
 
         } catch (error) {
             console.error('Error initiating payment:', error);
-            alert('Failed to initialize payment gateway.');
+            if (trackedPaymentId) {
+                await supabase
+                    .from('payments')
+                    .update({ status: 'failed' })
+                    .eq('id', trackedPaymentId);
+            }
+            alert(error instanceof Error ? error.message : 'Failed to initialize payment gateway.');
             setLoading(false);
         }
     };

@@ -21,9 +21,35 @@ const getE2EState = () => {
   return (window as any).__NILAYAM_E2E__ || null;
 };
 
+const PROFILE_CACHE_KEY = 'nilayam_profile_cache';
+
 const clearPendingRoleSetup = () => {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem('nilayam_pending_role_setup');
+};
+
+const readCachedProfile = (userId: string): Profile | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.userId !== userId || !parsed?.profile) {
+      return null;
+    }
+    return parsed.profile as Profile;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedProfile = (userId: string, profile: Profile | null) => {
+  if (typeof window === 'undefined') return;
+  if (!profile) {
+    window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    return;
+  }
+  window.sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId, profile }));
 };
 
 const normalizeRole = (role: unknown): UserRole | null => {
@@ -80,6 +106,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setProfile(null);
     localStorage.removeItem('nilayam_has_session');
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    }
+  }, []);
+
+  const applySessionState = useCallback((nextSession: Session | null) => {
+    setSession(nextSession);
+    const nextUser = nextSession?.user ?? null;
+    setUser(nextUser);
+    if (nextUser) {
+      const cachedProfile = readCachedProfile(nextUser.id);
+      setProfile(cachedProfile || buildFallbackProfile(nextUser));
+      localStorage.setItem('nilayam_has_session', 'true');
+    } else {
+      setProfile(null);
+      localStorage.removeItem('nilayam_has_session');
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      }
+    }
+    return nextUser;
   }, []);
 
   const fetchProfile = useCallback(async (currentUser: User) => {
@@ -87,7 +134,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     activeFetchRef.current = fetchId;
 
     try {
-      console.log(`AuthContext: Fetching profile for ${currentUser.id} (ID: ${fetchId})`);
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`*`)
@@ -96,30 +142,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only apply state updates if this is still the most recent fetch request
       if (activeFetchRef.current !== fetchId) {
-        console.log(`AuthContext: Stale fetch ${fetchId} ignored.`);
         return;
       }
 
       activeFetchRef.current = null; // Clear since we finished the latest one
 
       if (!profileData && !profileError) {
-        setProfile(buildFallbackProfile(currentUser));
+        const fallbackProfile = buildFallbackProfile(currentUser);
+        setProfile(fallbackProfile);
+        writeCachedProfile(currentUser.id, fallbackProfile);
       } else if (profileData) {
         const fallbackProfile = buildFallbackProfile(currentUser, profileData);
         setProfile(fallbackProfile);
+        writeCachedProfile(currentUser.id, fallbackProfile);
       } else {
-        setProfile(buildFallbackProfile(currentUser));
+        const fallbackProfile = buildFallbackProfile(currentUser);
+        setProfile(fallbackProfile);
+        writeCachedProfile(currentUser.id, fallbackProfile);
         if (profileError) throw profileError;
       }
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log("AuthContext: Profile fetch aborted naturally.");
-      } else {
+      if (err.name !== 'AbortError') {
         console.error("Error fetching profile:", err);
       }
-      setProfile(buildFallbackProfile(currentUser));
-    } finally {
-      console.log(`AuthContext: fetchProfile finished for ID: ${fetchId}`);
+      const fallbackProfile = buildFallbackProfile(currentUser);
+      setProfile(fallbackProfile);
+      writeCachedProfile(currentUser.id, fallbackProfile);
     }
   }, []);
 
@@ -154,7 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Safety timeout: ensure loading state is cleared after 8 seconds no matter what
+    // Safety timeout: ensure loading state is cleared after 4 seconds no matter what
     const safetyTimeout = setTimeout(() => {
       setLoading(currentLoading => {
         if (currentLoading) {
@@ -163,13 +211,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return currentLoading;
       });
-    }, 8000);
+    }, 4000);
 
     // Initial check to prevent indefinite loading in some environments
     const checkInitialSession = async () => {
-      let profileFetched = false;
       try {
-        console.log("AuthContext: Performing initial session check...");
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -179,76 +225,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (initialSession) {
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-
-          if (userError || !userData.user) {
-            console.warn("AuthContext: Cached session is no longer valid. Clearing local auth state.", userError);
-            await supabase.auth.signOut();
-            clearAuthState();
-            return;
+          const currentUser = applySessionState(initialSession);
+          if (currentUser) {
+            void fetchProfile(currentUser);
           }
-
-          setSession(initialSession);
-          setUser(userData.user);
-          setProfile(buildFallbackProfile(userData.user));
-          localStorage.setItem('nilayam_has_session', 'true');
-          console.log("AuthContext: User found, fetching profile...");
-          void fetchProfile(userData.user);
         } else {
           clearAuthState();
-          console.log("AuthContext: No initial session found.");
         }
       } catch (err) {
         console.error("AuthContext: Unexpected error in initial check:", err);
         clearAuthState();
       } finally {
         setLoading(false);
-        console.log("AuthContext: Initial check complete, loading cleared.");
       }
     };
 
     checkInitialSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log(`AuthContext: Auth state changed: ${event}`);
-      
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-        const hadActiveSession = Boolean(sessionRef.current || userRef.current);
-        if (event === 'SIGNED_IN') {
-            if (!hadActiveSession) {
-              setLoading(true);
-            }
-            localStorage.setItem('nilayam_has_session', 'true');
-        }
-        if (event === 'SIGNED_OUT') {
-            localStorage.removeItem('nilayam_has_session');
-        }
-
         try {
-          setSession(newSession);
-          const currentUser = newSession?.user ?? null;
-          setUser(currentUser);
+          const currentUser = applySessionState(newSession);
 
           if (currentUser) {
-            const { data: userData, error: userError } = await supabase.auth.getUser();
-            if (userError || !userData.user) {
-              console.warn("AuthContext: Auth event provided an invalid user. Clearing local auth state.", userError);
-              await supabase.auth.signOut();
-              clearAuthState();
-            } else {
-              setUser(userData.user);
-              setProfile(buildFallbackProfile(userData.user));
-              void fetchProfile(userData.user);
-            }
+            void fetchProfile(currentUser);
           } else {
-            setProfile(null);
+            clearAuthState();
           }
         } catch (e) {
           console.error("AuthContext: Error in onAuthStateChange handler:", e);
+          clearAuthState();
         } finally {
-          if (event !== 'SIGNED_IN' || !hadActiveSession) {
-            setLoading(false);
-          }
+          setLoading(false);
         }
       }
     });
@@ -257,14 +265,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authListener?.subscription.unsubscribe();
       clearTimeout(safetyTimeout);
     };
-  }, [clearAuthState, fetchProfile]);
+  }, [applySessionState, clearAuthState, fetchProfile]);
 
   const updateProfileState = (newProfile: Profile) => {
-    console.log("AuthContext: Explicitly updating profile state:", newProfile);
-    setProfile({
+    const normalizedProfile = {
       ...newProfile,
       role: normalizeRole(newProfile.role),
-    });
+    };
+    setProfile(normalizedProfile);
+    if (normalizedProfile.id) {
+      writeCachedProfile(normalizedProfile.id, normalizedProfile);
+    }
   };
 
   const effectiveRole = profile?.role || normalizeRole(user?.user_metadata?.role) || null;

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { isSupabaseConfigured, supabase } from '../services/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon, LogoIcon, ArrowLeftIcon } from '../constants';
 import ThemeToggle from '../components/ui/ThemeToggle';
@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
+import { getOAuthRedirectUrl } from '../utils/auth';
 
 const setPendingRoleSetup = () => {
     if (typeof window === 'undefined') return;
@@ -96,7 +97,7 @@ const AuthPage: React.FC = () => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/dashboard-router`
+                    redirectTo: getOAuthRedirectUrl()
                 }
             });
             if (error) throw error;
@@ -136,6 +137,11 @@ const AuthPage: React.FC = () => {
                         <h1 className="text-3xl font-black text-neutral-900 dark:text-white tracking-tight">{isSignUp ? 'Create an Account' : 'Welcome Back!'}</h1>
                         <p className="mt-2 text-neutral-500 dark:text-neutral-400 font-medium">{isSignUp ? t('signup.subtitle') : 'Sign in to your dashboard'}</p>
                     </div>
+                    {!isSupabaseConfigured && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+                            Local setup is missing `VITE_SUPABASE_URL` and/or `VITE_SUPABASE_ANON_KEY`, so sign-in is disabled until `.env.local` is configured.
+                        </div>
+                    )}
                     <form className="space-y-6" onSubmit={handleEmailAuthAction}>
                         {isSignUp && (<div className="animate-fade-in"><InputField id="fullName" label="Full Name" type="text" value={fullName} onChange={setFullName} required /></div>)}
                         <InputField id="email" label={t('label.email')} type="email" value={email} onChange={setEmail} required />
@@ -150,6 +156,7 @@ const AuthPage: React.FC = () => {
                                 isLoading={loading}
                                 fullWidth
                                 variant="primary"
+                                disabled={!isSupabaseConfigured}
                             >
                                 {t('btn.submit') || 'Submit'}
                             </Button>
@@ -167,7 +174,7 @@ const AuthPage: React.FC = () => {
 
                     <button
                         onClick={handleGoogleSignIn}
-                        disabled={loading}
+                        disabled={loading || !isSupabaseConfigured}
                         className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white dark:bg-neutral-800 border-2 border-neutral-200 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-all active:scale-95 disabled:opacity-50 group font-bold text-neutral-700 dark:text-white"
                     >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">

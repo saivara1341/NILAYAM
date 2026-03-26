@@ -107,6 +107,16 @@ export const {
 
 export const globalStyles = globalCss({
   '*': { boxSizing: 'border-box' },
+  ':root': {
+    '--ornate-lotus': "url('/bg-lotus-outline.svg')",
+    '--ornate-vines': "url('/bg-vines.svg')",
+    '--ornate-mandala': "url('/bg-mandala-warm.svg')",
+    '--ornate-medallion': "url('/bg-medallion-green.svg')",
+    '--ornate-shell-overlay': 'linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(239, 244, 255, 0.9) 30%, rgba(255, 255, 255, 0.94) 100%)',
+    '--ornate-shell-opacity': '0.22',
+    '--ornate-shell-blend': 'multiply',
+    '--ornate-surface-opacity': '0.14',
+  },
   body: {
     margin: 0,
     backgroundColor: '$background',
@@ -194,5 +204,74 @@ export const globalStyles = globalCss({
   '.dark .btn-danger': {
     backgroundColor: '#dc2626',
     borderColor: '#ef4444',
+  },
+  '.dark': {
+    '--ornate-shell-overlay': 'linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(15, 23, 42, 0.94) 48%, rgba(3, 7, 18, 0.97) 100%)',
+    '--ornate-shell-opacity': '0.08',
+    '--ornate-shell-blend': 'screen',
+    '--ornate-surface-opacity': '0.06',
+  },
+  '.ornate-shell': {
+    position: 'relative',
+    isolation: 'isolate',
+    backgroundImage: 'var(--ornate-shell-overlay)',
+    overflow: 'hidden',
+  },
+  '.ornate-shell::before': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    zIndex: -2,
+    pointerEvents: 'none',
+    opacity: 'var(--ornate-shell-opacity)',
+    backgroundImage: 'var(--ornate-lotus), var(--ornate-vines), var(--ornate-mandala), var(--ornate-medallion)',
+    backgroundRepeat: 'no-repeat, no-repeat, no-repeat, no-repeat',
+    backgroundPosition: 'right -3.5rem top 7rem, left -2rem top 12rem, right 9% bottom 6%, left 6% bottom 12%',
+    backgroundSize: '15rem 15rem, 16rem auto, 18rem 18rem, 12rem 12rem',
+    mixBlendMode: 'var(--ornate-shell-blend)',
+  },
+  '.ornate-shell::after': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    zIndex: -1,
+    pointerEvents: 'none',
+    background: 'radial-gradient(circle at top center, rgba(56, 189, 248, 0.12), transparent 36%), radial-gradient(circle at bottom left, rgba(34, 197, 94, 0.12), transparent 32%)',
+  },
+  '@media (max-width: 767px)': {
+    '.ornate-shell::before': {
+      backgroundPosition: 'right -4rem top 5.5rem, left -5rem top 20rem, right -3rem bottom 14%, left -2rem bottom 7%',
+      backgroundSize: '11rem 11rem, 11rem auto, 12rem 12rem, 8.5rem 8.5rem',
+    },
+  },
+  '.ornate-surface': {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  '.ornate-surface::before': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    opacity: 'var(--ornate-surface-opacity)',
+    backgroundImage: 'var(--ornate-vines), var(--ornate-lotus)',
+    backgroundRepeat: 'no-repeat, no-repeat',
+    backgroundPosition: 'right -5rem bottom -4rem, left -4rem top -4rem',
+    backgroundSize: '11rem auto, 8rem 8rem',
+  },
+  '.ornate-panel': {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  '.ornate-panel::after': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    opacity: 'calc(var(--ornate-surface-opacity) * 0.9)',
+    backgroundImage: 'var(--ornate-medallion)',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right -2.5rem bottom -2.5rem',
+    backgroundSize: '8rem 8rem',
   },
 });

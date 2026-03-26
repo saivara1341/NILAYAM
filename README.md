@@ -12,12 +12,53 @@ View your app in AI Studio: https://ai.studio/apps/drive/1hVHiBtFxMKuol5CUci6eZc
 
 **Prerequisites:**  Node.js
 
-
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+2. Create your active environment file:
+   `Copy-Item .env.test.example .env.test`
+3. Fill in the real values for Supabase, Razorpay, and Gemini.
+4. Run the app in test mode:
+   `npm run dev:test`
+
+## Live And Test Environments
+
+This app now supports separate `test` and `live` frontend environments through Vite modes.
+
+- `npm run dev:test`
+  Uses `.env.test`
+- `npm run build:test`
+  Builds with `.env.test`
+- `npm run dev:live`
+  Uses `.env.production`
+- `npm run build:live`
+  Builds with `.env.production`
+
+Suggested setup:
+
+- Copy `.env.test.example` to `.env.test`
+- Copy `.env.production.example` to `.env.production`
+- Put your test Supabase project keys in `.env.test`
+- Put your live Supabase project keys in `.env.production`
+
+## Google Sign-In
+
+`Continue with Google` now redirects back to the hash route used by the app:
+
+- Local test callback:
+  `http://localhost:5173/#/dashboard-router`
+- Live callback:
+  `https://nilayam.in/#/dashboard-router`
+
+To make Google login work:
+
+1. In Supabase, open `Authentication -> Providers -> Google` and enable Google.
+2. In Google Cloud, add the Supabase callback URL shown by your Supabase project to the OAuth client.
+3. In Supabase `Authentication -> URL Configuration`, add these redirect URLs:
+   `http://localhost:5173/#/dashboard-router`
+   `https://nilayam.in/#/dashboard-router`
+4. Make sure `.env.test` points to your test Supabase project and `.env.production` points to your live Supabase project.
+
+If you deploy to another domain, set `VITE_AUTH_REDIRECT_URL` to that exact `#/dashboard-router` URL.
 
 ## Deploy to GitHub Pages
 

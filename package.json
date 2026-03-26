@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:test": "vite --mode test",
+    "dev:live": "vite --mode production",
     "build": "vite build",
+    "build:test": "vite build --mode test",
+    "build:live": "vite build --mode production",
     "preview": "vite preview",
     "cap:sync": "npx cap sync",
     "app:android": "npm run build && npx cap sync android",

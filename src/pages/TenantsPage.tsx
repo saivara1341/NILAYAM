@@ -11,6 +11,8 @@ import { LeaseIcon, UserCircleIcon, BuildingIcon, HomeIcon, SearchIcon, BadgeChe
 import { useToast } from '../contexts/ToastContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { EmptyPeopleIllustration } from '../components/ui/StateIllustrations';
+import { Check, Copy } from 'lucide-react';
+import { copyText, openPhoneDialer, openWhatsAppChat } from '../utils/sharing';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -50,6 +52,17 @@ const TenantRow: React.FC<{
     onDraftLease: (tenant: Tenant) => void;
 }> = ({ tenant, isSelected, onSelect, onDraftLease }) => {
     const { t } = useLanguage();
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyPhone = async () => {
+        if (!tenant.phone_number) return;
+        const ok = await copyText(tenant.phone_number);
+        if (ok) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+        }
+    };
+
     return (
     <tr className="border-b border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group">
         <td className="px-4 py-4">
@@ -75,8 +88,32 @@ const TenantRow: React.FC<{
         <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400">
             <span className="px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded text-xs font-medium">{tenant.house_number}</span>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400 font-mono">{tenant.phone_number || 'N/A'}</td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400 font-mono">
+            <div className="flex items-center gap-2">
+                <span>{tenant.phone_number || 'N/A'}</span>
+                {tenant.phone_number && (
+                    <>
+                        <button onClick={() => openPhoneDialer(tenant.phone_number)} className="rounded-lg border border-neutral-200 px-2 py-1 text-[11px] font-bold text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                            Call
+                        </button>
+                        <button onClick={() => void handleCopyPhone()} className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 px-2 py-1 text-[11px] font-bold text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            {copied ? 'Copied' : 'Copy'}
+                        </button>
+                    </>
+                )}
+            </div>
+        </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end gap-3">
+            {tenant.phone_number && (
+                <button
+                    onClick={() => openWhatsAppChat(tenant.phone_number, `Hi ${tenant.name || 'there'}, this is from Nilayam regarding your tenancy.`)}
+                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-green-600 hover:text-green-700 transition-all px-3 py-1.5 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20"
+                    title="WhatsApp Tenant"
+                >
+                    <span className="text-xs font-semibold">WhatsApp</span>
+                </button>
+            )}
             <button 
                 onClick={() => onDraftLease(tenant)}
                 className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-neutral-500 hover:text-primary dark:hover:text-primary-light transition-all px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -92,6 +129,17 @@ const TenantRow: React.FC<{
 
 const TenantCardMobile: React.FC<{ tenant: Tenant; onDraftLease: (tenant: Tenant) => void }> = ({ tenant, onDraftLease }) => {
     const { t } = useLanguage();
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyPhone = async () => {
+        if (!tenant.phone_number) return;
+        const ok = await copyText(tenant.phone_number);
+        if (ok) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+        }
+    };
+
     return (
     <div className="bg-white dark:bg-neutral-800 p-5 rounded-2xl shadow-sm border border-neutral-200/60 dark:border-neutral-700/60 mb-4 flex flex-col gap-4">
         <div className="flex justify-between items-start">
@@ -108,6 +156,16 @@ const TenantCardMobile: React.FC<{ tenant: Tenant; onDraftLease: (tenant: Tenant
              <div className="bg-neutral-50 dark:bg-neutral-900/50 p-3 rounded-xl text-sm"><span className="block text-xs text-neutral-500">{t('tenants.col_building')}</span>{tenant.building_name}</div>
              <div className="bg-neutral-50 dark:bg-neutral-900/50 p-3 rounded-xl text-sm"><span className="block text-xs text-neutral-500">{t('tenants.col_unit')}</span>{tenant.house_number}</div>
         </div>
+        {tenant.phone_number && (
+            <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => openPhoneDialer(tenant.phone_number)} className="rounded-xl border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs font-bold text-neutral-800 dark:text-neutral-100">Call</button>
+                <button onClick={() => openWhatsAppChat(tenant.phone_number, `Hi ${tenant.name || 'there'}, this is from Nilayam regarding your tenancy.`)} className="rounded-xl bg-green-600 px-3 py-2 text-xs font-bold text-white">WhatsApp</button>
+                <button onClick={() => void handleCopyPhone()} className="inline-flex items-center justify-center gap-1 rounded-xl border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs font-bold text-neutral-800 dark:text-neutral-100">
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
+            </div>
+        )}
         <button onClick={() => onDraftLease(tenant)} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-primary bg-blue-50 dark:bg-blue-900/20 py-3 rounded-xl">
             <LeaseIcon className="w-4 h-4" /> {t('qa.draft_lease')}
         </button>

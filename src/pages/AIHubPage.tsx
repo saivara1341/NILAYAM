@@ -4,7 +4,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import Card from '../components/ui/Card';
 import { SparklesIcon, CloudUploadIcon } from '../constants';
 import Spinner from '../components/ui/Spinner';
-import { analyzeImageWithPrompt } from '../services/api';
+import { analyzeImageWithPrompt, getQuickAiResponse } from '../services/api';
 import MarketingPosterDesigner from '../components/ai/MarketingPosterDesigner';
 import AppMarketingGenerator from '../components/ai/AppMarketingGenerator';
 import QuickAssist from '../components/ai/QuickAssist';
@@ -80,12 +80,44 @@ const ImageAnalyzer: React.FC = () => {
 };
 
 const LiveChat: React.FC = () => {
+    const [input, setInput] = useState('');
+    const [reply, setReply] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleAsk = async () => {
+        if (!input.trim()) {
+            setError('Please enter a question or task for the assistant.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        setReply('');
+        try {
+            const response = await getQuickAiResponse(`You are Nilayam's live property operations assistant. Help with tenant communication, maintenance triage, rent reminders, agreements, and resident operations.\n\nUser request: ${input}`);
+            setReply(response);
+        } catch (err: any) {
+            setError(err.message || 'Unable to get a response right now.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Card>
-             <h3 className="text-xl font-semibold text-blue-900 dark:text-slate-200">Live Conversation Agent (Coming Soon)</h3>
-             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Speak with an AI agent in real-time. This feature is currently under development.</p>
-             <div className="h-48 flex items-center justify-center bg-slate-100 dark:bg-slate-900/50 rounded-lg">
-                <p className="text-slate-500">Feature not yet implemented.</p>
+             <h3 className="text-xl font-semibold text-blue-900 dark:text-slate-200">Live Operations Assistant</h3>
+             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Ask for help drafting notices, handling tenant issues, planning events, or resolving operational problems.</p>
+             <div className="space-y-4">
+                <textarea value={input} onChange={e => setInput(e.target.value)} className="w-full form-input" rows={4} placeholder="Example: Draft a polite rent reminder for a tenant who is 3 days late, or summarize what to do for an upcoming lease expiry." />
+                <button onClick={handleAsk} disabled={loading || !input.trim()} className="btn btn-primary w-full">
+                    {loading ? <Spinner /> : 'Ask Assistant'}
+                </button>
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                {reply && (
+                    <div className="rounded-lg bg-slate-100 p-4 text-sm whitespace-pre-wrap dark:bg-slate-900/50">
+                        {reply}
+                    </div>
+                )}
              </div>
         </Card>
     )

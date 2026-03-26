@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
-import { GoogleGenAI } from "@google/genai";
 import { Tenant } from '../../types';
 import Spinner from '../ui/Spinner';
 import { LeaseIcon } from '../../constants';
+import { generateAgreementDraft } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface LeaseGeneratorModalProps {
     isOpen: boolean;
@@ -28,6 +29,7 @@ const HYDERABAD_CLAUSES = [
 ];
 
 const LeaseGeneratorModal: React.FC<LeaseGeneratorModalProps> = ({ isOpen, onClose, tenant }) => {
+    const { profile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [leaseContent, setLeaseContent] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -39,27 +41,41 @@ const LeaseGeneratorModal: React.FC<LeaseGeneratorModalProps> = ({ isOpen, onClo
         setLoading(true);
         setError(null);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `
-                Act as a professional real estate lawyer in India. Draft a comprehensive residential rental agreement (lease) between:
-                Landlord: [Owner Name Placeholder]
-                Tenant: ${tenant.name}
-                Property: ${tenant.building_name}, Unit ${tenant.house_number}
-                Duration: ${duration}
-                
-                Specific Terms & Clauses to Include:
-                ${terms || "Standard residential lease terms only."}
-                
-                Format it nicely with clear sections for "Rent", "Security Deposit", "Maintenance", "Termination", etc.
-                Do not use markdown code blocks, just plain text with formatting.
-            `;
-
-            // Fix: Use gemini-3-flash-preview for high-quality, professional legal drafting
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt,
+            const agreement = await generateAgreementDraft({
+                houseId: tenant.id,
+                ownerName: profile?.full_name || 'Property Owner',
+                tenantName: tenant.name || 'Tenant',
+                buildingName: tenant.building_name || 'Property',
+                houseNumber: tenant.house_number || 'Unit',
+                agreement: {
+                    house_id: tenant.id,
+                    tenant_id: null,
+                    agreement_type: 'residential_rental',
+                    template_name: 'AI lease architect draft',
+                    status: 'active',
+                    agreement_start_date: null,
+                    agreement_end_date: null,
+                    monthly_rent: 0,
+                    security_deposit: 0,
+                    renewal_notice_days: 30,
+                    notice_period_days: 30,
+                    owner_requirements: `Draft duration: ${duration}`,
+                    tenant_requirements: null,
+                    special_clauses: terms
+                        .split('\n')
+                        .map((line) => line.replace(/^-+\s*/, '').trim())
+                        .filter(Boolean),
+                    legal_notes: 'Generated from AI Lease Architect modal. Review before execution.',
+                    drafted_document: null,
+                    drafted_at: null,
+                    vacate_notice_date: null,
+                    vacate_reason: null,
+                    stamp_duty_status: 'pending',
+                    registration_status: 'pending',
+                    last_updated_at: new Date().toISOString()
+                }
             });
-            setLeaseContent(response.text || '');
+            setLeaseContent(agreement.drafted_document || '');
         } catch (err: any) {
             setError(err.message || "Failed to generate lease.");
         } finally {

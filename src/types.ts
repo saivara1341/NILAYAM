@@ -16,12 +16,21 @@ export interface BankDetails {
 
 export interface PaymentMethods {
     enableRazorpay?: boolean;
+    razorpayRouteEnabled?: boolean;
+    razorpayLinkedAccountId?: string;
+    settlementPreference?: 'platform' | 'direct_owner';
     upiId?: string;
     mobileNumber?: string;
     qrCodeUrl?: string;
     paymentInstructions?: string;
     bankDetails?: BankDetails;
     payeeName?: string;
+    settlementNotes?: string;
+}
+
+export interface PersonContact {
+    name?: string | null;
+    phone_number?: string | null;
 }
 
 export interface Profile {
@@ -235,6 +244,24 @@ export interface Listing {
 
 export type NewListingData = Omit<Listing, 'id' | 'created_at' | 'owner_id' | 'building_name' | 'address'> & { house_id?: string | null };
 
+export type ProductCondition = 'new' | 'like_new' | 'used';
+
+export interface ProductListing {
+    id: string;
+    created_at: string;
+    seller_id: string;
+    seller_name: string;
+    seller_role?: UserRole | null;
+    title: string;
+    description: string;
+    price: number;
+    category: string;
+    condition: ProductCondition;
+    contact_info: string;
+    location?: string;
+    images?: string[];
+}
+
 export interface VacantUnit {
     id: string;
     house_number: string;
@@ -286,6 +313,41 @@ export interface Payment {
     proof_url?: string;
     payment_mode?: 'razorpay' | 'manual';
     razorpay_payment_id?: string;
+    tenant_name?: string | null;
+    tenant_phone_number?: string | null;
+    building_name?: string | null;
+    house_number?: string | null;
+}
+
+export interface OwnerPaymentSummary {
+    totalCollected: number;
+    pendingVerificationAmount: number;
+    overdueAmount: number;
+    overdueCount: number;
+    collectionsThisMonth: number;
+    pendingVerificationCount: number;
+    manualProofCount: number;
+    onlinePaymentCount: number;
+}
+
+export interface OwnerPaymentFilters {
+    status?: Payment['status'] | 'all';
+    paymentMode?: Payment['payment_mode'] | 'all';
+    propertyId?: string;
+    search?: string;
+}
+
+export interface OwnerPaymentPropertyOption {
+    id: string;
+    name: string;
+}
+
+export interface OwnerPaymentsDashboard {
+    summary: OwnerPaymentSummary;
+    payments: Payment[];
+    pendingApprovals: Payment[];
+    recentPayments: Payment[];
+    propertyOptions: OwnerPaymentPropertyOption[];
 }
 
 export type ChargeCategory =
@@ -338,12 +400,21 @@ export interface AgreementWorkflow {
     house_id: string;
     agreement_type: AgreementType;
     status: AgreementStatus;
+    template_name?: string | null;
     agreement_start_date?: string | null;
     agreement_end_date?: string | null;
+    monthly_rent?: number;
+    security_deposit?: number;
     renewal_notice_days: number;
     vacate_notice_date?: string | null;
     vacate_reason?: string | null;
     notice_period_days?: number;
+    owner_requirements?: string | null;
+    tenant_requirements?: string | null;
+    special_clauses?: string[];
+    legal_notes?: string | null;
+    drafted_document?: string | null;
+    drafted_at?: string | null;
     stamp_duty_status?: 'pending' | 'completed' | 'na';
     registration_status?: 'pending' | 'completed' | 'na';
     last_updated_at: string;
@@ -377,22 +448,51 @@ export interface TenantLifecycleData {
     tenant_score?: number;
 }
 
+export interface TenantScoreFactor {
+    label: string;
+    impact: number;
+    status: 'positive' | 'neutral' | 'negative';
+    description: string;
+}
+
+export interface TenantScoreSummary {
+    score: number;
+    band: 'excellent' | 'good' | 'watchlist' | 'high_risk';
+    factors: TenantScoreFactor[];
+    explanation: string;
+}
+
+export interface TenantLogEntry {
+    id: string;
+    title: string;
+    description: string;
+    occurred_at: string;
+    category: 'payment' | 'agreement' | 'maintenance' | 'verification' | 'reminder' | 'lifecycle';
+    tone: 'success' | 'info' | 'warning';
+}
+
 export interface TenantOperationalData {
     ledger: ChargeLedgerEntry[];
     agreement: AgreementWorkflow;
     reminders: ReminderRecord[];
     lifecycle?: TenantLifecycleData;
+    scorecard?: TenantScoreSummary;
+    activityLog?: TenantLogEntry[];
 }
 
 export interface TenantProfile extends Tenant {
     building_id: string;
     tenant_id?: string | null;
+    owner_name?: string | null;
+    owner_phone_number?: string | null;
     rent_amount: number;
     lease_end_date: string | null;
     parking_slot?: string;
     payments: Payment[];
     operations?: TenantOperationalData;
     lifecycle?: TenantLifecycleData;
+    scorecard?: TenantScoreSummary;
+    activityLog?: TenantLogEntry[];
 }
 
 export interface TenantDashboardData {
@@ -416,9 +516,25 @@ export interface TenantDashboardData {
     recentAnnouncements: any[];
     openMaintenanceRequests: any[];
     landlordPaymentDetails?: PaymentMethods;
+    landlordContact?: PersonContact;
     chargeLedger: ChargeLedgerEntry[];
     agreement: AgreementWorkflow | null;
     reminders: ReminderRecord[];
+    lifecycle?: TenantLifecycleData;
+    scorecard?: TenantScoreSummary;
+    activityLog?: TenantLogEntry[];
+}
+
+export interface AgreementWorkspaceItem {
+    house_id: string;
+    tenant_id?: string | null;
+    tenant_name?: string | null;
+    building_id?: string | null;
+    building_name: string;
+    house_number: string;
+    rent_amount: number;
+    lease_end_date?: string | null;
+    agreement: AgreementWorkflow;
     lifecycle?: TenantLifecycleData;
 }
 
@@ -540,6 +656,28 @@ export interface ForecastDataPoint {
     predictedIncome: number;
     confidence: number;
     trend: 'up' | 'down' | 'stable';
+}
+
+export interface CommunityEventRsvp {
+    user_id: string;
+    name: string;
+    role: string;
+    status: 'going' | 'interested';
+}
+
+export interface CommunityEvent {
+    id: string;
+    building_id: string;
+    title: string;
+    description: string;
+    category: 'social' | 'maintenance' | 'wellness' | 'meeting' | 'festival' | 'marketplace';
+    venue: string;
+    starts_at: string;
+    host_name: string;
+    status: 'upcoming' | 'live' | 'completed';
+    capacity?: number;
+    attendees?: CommunityEventRsvp[];
+    created_at: string;
 }
 
 export type LanguageCode = 'en' | 'te' | 'hi' | 'ta' | 'kn' | 'ml' | 'mr' | 'bn' | 'gu' | 'pa';

@@ -1,369 +1,604 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+    ArrowRight,
+    BedDouble,
+    Building2,
+    ExternalLink,
+    Filter,
+    IndianRupee,
+    MapPin,
+    Package,
+    Search,
+    Share2,
+    ShoppingBag,
+    Sparkles,
+    Store,
+} from 'lucide-react';
 import Card from '../components/ui/Card';
-import { CheckCircleIcon, BedIcon, BathIcon, SquareFootIcon, PhoneIcon, MessageCircleIcon, TagIcon, MapPinIcon } from '../constants';
-import { Listing } from '../types';
-import { getMarketplaceListings, sendMarketplaceOffer } from '../services/api';
 import Modal from '../components/ui/Modal';
 import Spinner from '../components/ui/Spinner';
-import ImmersiveViewer from '../components/properties/ImmersiveViewer';
-import { sharePropertyLocation } from '../utils/sharing';
+import { useAuth } from '../contexts/AuthContext';
+import { createProductMarketplaceListing, getMarketplaceListings, getProductMarketplaceListings } from '../services/api';
+import { Listing, ListingType, ProductCondition, ProductListing } from '../types';
+import { copyText, openPhoneDialer, openWhatsAppChat, shareListingDetails } from '../utils/sharing';
 
+type MarketplaceFilter = 'all' | 'rent' | 'sale' | 'products';
 
-const SearchBar: React.FC = () => (
-    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md border border-slate-200 dark:border-slate-700">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div>
-                <label htmlFor="location" className="block text-sm font-medium text-slate-600 dark:text-slate-400">Location</label>
-                <input type="text" id="location" placeholder="e.g., 'Mumbai'" className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200" />
-            </div>
-            <div>
-                <label htmlFor="prop-type" className="block text-sm font-medium text-slate-600 dark:text-slate-400">Property Type</label>
-                <select id="prop-type" className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200">
-                    <option>Any</option>
-                    <option>For Sale</option>
-                    <option>For Rent</option>
-                </select>
-            </div>
-            <div>
-                <label htmlFor="price-range" className="block text-sm font-medium text-slate-600 dark:text-slate-400">Price Range</label>
-                <input type="text" id="price-range" placeholder="e.g., '50L - 1Cr'" className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200" />
-            </div>
-            <button className="bg-blue-800 dark:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-900 dark:hover:bg-blue-700 transition-colors w-full">
-                Search
-            </button>
-        </div>
-    </div>
-);
+const currency = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+});
 
-const ImageCarousel: React.FC<{ images: string[], alt: string, onClick: () => void }> = ({ images, alt, onClick }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+const filterMeta: Array<{ id: MarketplaceFilter; label: string; hint: string }> = [
+    { id: 'all', label: 'All', hint: 'Rent, buy, and sell in one place' },
+    { id: 'rent', label: 'Rent Homes', hint: 'Tenants can find a new house quickly' },
+    { id: 'sale', label: 'Buy Property', hint: 'Explore homes and investments for sale' },
+    { id: 'products', label: 'Products', hint: 'Residents can sell useful items too' },
+];
 
-    const handlePrev = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-    };
-
-    const handleNext = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    };
-
-    return (
-        <div className="relative h-56 group overflow-hidden" onClick={onClick}>
-            <img src={images[currentIndex]} alt={alt} className="w-full h-full object-cover bg-slate-200 transition-transform duration-700 group-hover:scale-105 cursor-pointer" />
-            
-            {images.length > 1 && (
-                <>
-                    <button 
-                        onClick={handlePrev} 
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
-                    </button>
-                    <button 
-                        onClick={handleNext} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                    </button>
-                    
-                    {/* Dots Indicator */}
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-1.5 z-10">
-                        {images.map((_, idx) => (
-                            <div 
-                                key={idx} 
-                                className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all duration-300 ${currentIndex === idx ? 'bg-white scale-125 w-2' : 'bg-white/50'}`}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
-        </div>
-    );
+const conditionLabels: Record<ProductCondition, string> = {
+    new: 'New',
+    like_new: 'Like New',
+    used: 'Used',
 };
 
-const ListingCard: React.FC<{ listing: Listing; onClick: () => void }> = ({ listing, onClick }) => {
-    const images = (listing.images && listing.images.length > 0) 
-        ? listing.images 
-        : [listing.image_url || `https://api.dicebear.com/8.x/icons/svg?seed=${listing.building_name}`];
+const getListingLabel = (type: ListingType) => (type === 'rent' ? 'For Rent' : 'For Sale');
 
-    return (
-        <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col p-0 overflow-hidden h-full cursor-pointer group">
-            <div className="relative">
-                <ImageCarousel images={images} alt={`Property at ${listing.address}`} onClick={onClick} />
-                <div className={`absolute top-2 right-2 flex items-center px-2 py-1 rounded-full text-xs font-semibold shadow-sm z-10
-                    ${listing.listing_type === 'sale' ? 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-300'}`}>
-                    For {listing.listing_type === 'sale' ? 'Sale' : 'Rent'}
-                </div>
-                 <div className="absolute bottom-2 left-2 flex items-center bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-full text-xs font-semibold shadow-sm z-10">
-                    <CheckCircleIcon className="w-4 h-4 mr-1 text-green-400"/>
-                    Verified Owner
-                </div>
-            </div>
-            <div className="p-5 flex-grow flex flex-col">
-                <div className="flex-grow">
-                    <p className="text-2xl font-bold text-blue-800 dark:text-blue-300">
-                        ₹{listing.price.toLocaleString('en-IN')}
-                        {listing.listing_type === 'rent' && <span className="text-base font-normal text-slate-500 dark:text-slate-400">/month</span>}
-                    </p>
-                    <p className="mt-1 font-semibold text-blue-950 dark:text-slate-200 truncate">
-                        {listing.listing_type === 'sale' ? listing.building_name : `Unit in ${listing.building_name}`}
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
-                        <MapPinIcon className="w-3 h-3 flex-shrink-0" />
-                        {listing.address}
-                    </p>
+const getPropertyImage = (listing: Listing) => listing.images?.[0] || listing.image_url || '';
 
-                    <div className="mt-3 flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-300">
-                        {listing.bedrooms && <span className="flex items-center"><BedIcon className="w-4 h-4 mr-1"/> {listing.bedrooms} Beds</span>}
-                        {listing.bathrooms && <span className="flex items-center"><BathIcon className="w-4 h-4 mr-1"/> {listing.bathrooms} Baths</span>}
-                        {listing.area_sqft && <span className="flex items-center"><SquareFootIcon className="w-4 h-4 mr-1"/> {listing.area_sqft} sqft</span>}
-                    </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <button onClick={onClick} className="text-sm font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors">View Details</button>
-                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </div>
-        </Card>
-    );
-}
+const PropertyDetailsModal: React.FC<{
+    listing: Listing | null;
+    onClose: () => void;
+}> = ({ listing, onClose }) => {
+    if (!listing) return null;
 
-const ListingDetailsModal: React.FC<{ listing: Listing; onClose: () => void }> = ({ listing, onClose }) => {
-    const [activeImage, setActiveImage] = useState(0);
-    const [showContact, setShowContact] = useState(false);
-    const [showOfferForm, setShowOfferForm] = useState(false);
-    const [offerAmount, setOfferAmount] = useState('');
-    const [offerMessage, setOfferMessage] = useState('');
-    const [submittingOffer, setSubmittingOffer] = useState(false);
-    const [offerSuccess, setOfferSuccess] = useState(false);
-    const [lightboxOpen, setLightboxOpen] = useState(false);
-    const [immersiveConfig, setImmersiveConfig] = useState<{ isOpen: boolean; type: '3d' | '360'; url: string; title: string } | null>(null);
-
-    const images = listing.images && listing.images.length > 0 
-        ? listing.images 
-        : [listing.image_url || `https://api.dicebear.com/8.x/icons/svg?seed=${listing.building_name}`];
-
-    const handleMakeOffer = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmittingOffer(true);
-        try {
-            await sendMarketplaceOffer(listing.id, Number(offerAmount), offerMessage);
-            setOfferSuccess(true);
-            setTimeout(() => {
-                setShowOfferForm(false);
-                setOfferSuccess(false);
-                setOfferAmount('');
-            }, 3000);
-        } catch (error) {
-            alert("Failed to send offer. Please try again.");
-        } finally {
-            setSubmittingOffer(false);
-        }
-    };
-
-    const handleWhatsApp = () => {
-        const phoneMatch = listing.contact_info.match(/(\+?\d[\d\s-]{8,})/); 
-        if (phoneMatch) {
-            let phone = phoneMatch[0].replace(/\D/g, '');
-            if (phone.length === 10) phone = '91' + phone;
-            if (phone.length >= 10 && phone.length <= 15) {
-                window.open(`https://wa.me/${phone}?text=Hi, I am interested in your property: ${listing.building_name}`, '_blank');
-            } else {
-                alert("Contact info found, but the phone number format seems invalid.");
-            }
-        } else {
-            alert("Could not detect a valid phone number in the contact info.");
-        }
-    };
-
-    const handleMap = () => {
-        if (listing.coordinates) {
-             window.open(`https://www.google.com/maps/search/?api=1&query=${listing.coordinates.lat},${listing.coordinates.lng}`, '_blank');
-        } else {
-            const query = encodeURIComponent(`${listing.building_name}, ${listing.address}`);
-            window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-        }
-    }
-
-    const handleShare = async () => {
-        await sharePropertyLocation({
-            name: listing.building_name,
-            address: listing.address,
-            coordinates: listing.coordinates
+    const image = getPropertyImage(listing);
+    const shareProperty = async () => {
+        await shareListingDetails({
+            title: `${listing.building_name} • ${getListingLabel(listing.listing_type)}`,
+            text: [
+                `${listing.address}`,
+                `${currency.format(listing.price)}${listing.listing_type === 'rent' ? ' / month' : ''}`,
+                listing.description,
+            ].filter(Boolean).join('\n'),
+            url: listing.google_map_url,
         });
     };
 
-    const nextImage = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setActiveImage((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    }
-    const prevImage = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setActiveImage((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-    }
+    return (
+        <Modal isOpen={!!listing} onClose={onClose} title={listing.building_name} maxWidth="3xl">
+            <div className="space-y-6">
+                {image ? (
+                    <img src={image} alt={listing.building_name} className="h-64 w-full rounded-2xl object-cover" />
+                ) : (
+                    <div className="flex h-64 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                        <Building2 className="h-16 w-16" />
+                    </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                        {getListingLabel(listing.listing_type)}
+                    </span>
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">
+                        {currency.format(listing.price)}
+                        {listing.listing_type === 'rent' ? <span className="text-base font-semibold text-slate-500 dark:text-slate-400"> / month</span> : null}
+                    </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/70">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Location</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{listing.address}</div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/70">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Configuration</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                            {listing.bedrooms || 0} Bed • {listing.bathrooms || 0} Bath
+                        </div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/70">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Area</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{listing.area_sqft || 'NA'} sq ft</div>
+                    </div>
+                </div>
+
+                <p className="text-sm leading-7 text-slate-600 dark:text-slate-300">{listing.description}</p>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                    <button onClick={() => openWhatsAppChat(listing.contact_info, `Hi, I am interested in ${listing.building_name}.`)} className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600">
+                        WhatsApp Owner
+                    </button>
+                    <button onClick={() => openPhoneDialer(listing.contact_info)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                        Call Owner
+                    </button>
+                    <button onClick={() => copyText(listing.contact_info)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                        Copy Contact
+                    </button>
+                    <button onClick={shareProperty} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200">
+                        Share Listing
+                    </button>
+                </div>
+
+                {listing.google_map_url ? (
+                    <a
+                        href={listing.google_map_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300"
+                    >
+                        Open on Maps <ExternalLink className="h-4 w-4" />
+                    </a>
+                ) : null}
+            </div>
+        </Modal>
+    );
+};
+
+const ProductDetailsModal: React.FC<{
+    product: ProductListing | null;
+    onClose: () => void;
+}> = ({ product, onClose }) => {
+    if (!product) return null;
+
+    const shareProduct = async () => {
+        await shareListingDetails({
+            title: product.title,
+            text: [
+                `${currency.format(product.price)}`,
+                product.category,
+                conditionLabels[product.condition],
+                product.description,
+                product.location,
+            ].filter(Boolean).join('\n'),
+        });
+    };
 
     return (
-        <>
-            {lightboxOpen && (
-                <div 
-                    className="fixed inset-0 z-[70] bg-black/95 flex flex-col justify-center items-center"
-                    onClick={() => setLightboxOpen(false)}
-                >
-                    <button className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full" onClick={() => setLightboxOpen(false)}>
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                    <img src={images[activeImage]} alt="Fullscreen View" className="max-h-[85vh] max-w-[95vw] object-contain" onClick={(e) => e.stopPropagation()} />
-                </div>
-            )}
-
-            <Modal isOpen={true} onClose={onClose} title="Property Details" maxWidth="4xl">
-                <div className="flex flex-col lg:flex-row gap-6">
-                    <div className="lg:w-3/5 space-y-4">
-                        <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-md relative group cursor-zoom-in" onClick={() => setLightboxOpen(true)}>
-                            <img src={images[activeImage]} alt="Main View" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-slate-100">About this property</h3>
-                            <p className="text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{listing.description}</p>
-                            {(listing.threed_model_url || listing.panorama_url) && (
-                                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-                                    <h4 className="font-bold text-sm text-blue-900 dark:text-blue-400 uppercase tracking-wider mb-4">Experience it Virtually</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {listing.threed_model_url && (
-                                            <button onClick={() => setImmersiveConfig({ isOpen: true, type: '3d', url: listing.threed_model_url!, title: listing.building_name })} className="btn-secondary text-xs">View in 3D</button>
-                                        )}
-                                        {listing.panorama_url && (
-                                            <button onClick={() => setImmersiveConfig({ isOpen: true, type: '360', url: listing.panorama_url!, title: listing.building_name })} className="btn-secondary text-xs">360° Walkthrough</button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+        <Modal isOpen={!!product} onClose={onClose} title={product.title} maxWidth="2xl">
+            <div className="space-y-6">
+                {product.images?.[0] ? (
+                    <img src={product.images[0]} alt={product.title} className="h-64 w-full rounded-2xl object-cover" />
+                ) : (
+                    <div className="flex h-64 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-300">
+                        <Package className="h-16 w-16" />
                     </div>
-                    <div className="lg:w-2/5 space-y-6">
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700">
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white truncate">{listing.building_name}</h2>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm flex items-start gap-1 mt-1 break-words"><MapPinIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />{listing.address}</p>
-                            <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-4 mb-6">₹{listing.price.toLocaleString('en-IN')}{listing.listing_type === 'rent' && <span className="text-base font-normal text-slate-400 ml-1">/month</span>}</div>
-                            <div className="space-y-3">
-                                <button onClick={() => setShowOfferForm(true)} className="btn-primary w-full">Make an Offer</button>
-                                <button onClick={() => setShowContact(true)} className="btn-secondary w-full">Contact Owner</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {immersiveConfig && (
-                    <ImmersiveViewer
-                        isOpen={immersiveConfig.isOpen}
-                        onClose={() => setImmersiveConfig(prev => prev ? { ...prev, isOpen: false } : null)}
-                        type={immersiveConfig.type}
-                        url={immersiveConfig.url}
-                        title={immersiveConfig.title}
-                    />
                 )}
-            </Modal>
-        </>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                        {product.category}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                        {conditionLabels[product.condition]}
+                    </span>
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">{currency.format(product.price)}</span>
+                </div>
+
+                <p className="text-sm leading-7 text-slate-600 dark:text-slate-300">{product.description}</p>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/70">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Seller</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{product.seller_name}</div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/70">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Location</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{product.location || 'Nearby pickup / local delivery'}</div>
+                    </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                    <button onClick={() => openWhatsAppChat(product.contact_info, `Hi, I am interested in your product "${product.title}".`)} className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600">
+                        WhatsApp
+                    </button>
+                    <button onClick={() => openPhoneDialer(product.contact_info)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                        Call
+                    </button>
+                    <button onClick={() => copyText(product.contact_info)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                        Copy Number
+                    </button>
+                    <button onClick={shareProduct} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                        Share Product
+                    </button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 
 const MarketplacePage: React.FC = () => {
-    const [listings, setListings] = useState<Listing[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
     const navigate = useNavigate();
+    const { profile } = useAuth();
+    const isTenant = profile?.role === 'tenant';
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState<MarketplaceFilter>('all');
+    const [propertyListings, setPropertyListings] = useState<Listing[]>([]);
+    const [productListings, setProductListings] = useState<ProductListing[]>([]);
+    const [selectedProperty, setSelectedProperty] = useState<Listing | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<ProductListing | null>(null);
+    const [sellModalOpen, setSellModalOpen] = useState(false);
+    const [form, setForm] = useState({
+        title: '',
+        description: '',
+        category: '',
+        price: '',
+        contact_info: profile?.phone_number || '',
+        location: '',
+        condition: 'used' as ProductCondition,
+        imageUrls: '',
+    });
+
+    const loadMarketplace = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [properties, products] = await Promise.all([
+                getMarketplaceListings(),
+                getProductMarketplaceListings(),
+            ]);
+            setPropertyListings(properties);
+            setProductListings(products);
+        } catch (err: any) {
+            setError(err?.message || 'Failed to load marketplace.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchListings = async () => {
-            try {
-                setLoading(true);
-                const data = await getMarketplaceListings();
-                setListings(data);
-                setError(null);
-            } catch (err: any) {
-                setError(err.message || 'Failed to fetch listings.');
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchListings();
+        void loadMarketplace();
     }, []);
 
-    const renderContent = () => {
-        if (loading) return <div className="text-center py-12"><Spinner /></div>;
-        
-        if (error) return (
-            <div className="text-center py-12 p-8 rounded-3xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 shadow-xl shadow-red-500/5 transition-all animate-fade-in">
-                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                </div>
-                <h3 className="text-2xl font-black text-red-900 dark:text-red-300 tracking-tight">Marketplace Unreachable</h3>
-                <p className="text-red-700/70 dark:text-red-400/70 mt-3 max-w-sm mx-auto leading-relaxed">
-                    We're having trouble connecting to the marketplace database. Please check your connection or try again in a moment.
-                </p>
-                <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-                    <button 
-                        onClick={() => window.location.reload()} 
-                        className="px-8 py-3 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-600/30 active:scale-95"
-                    >
-                        Retry Connection
-                    </button>
-                    <button 
-                        onClick={() => navigate('/')} 
-                        className="px-8 py-3 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 rounded-2xl font-bold hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-all border border-neutral-200 dark:border-neutral-700 active:scale-95"
-                    >
-                        Go Home
-                    </button>
-                </div>
-            </div>
-        );
-        
-        if (listings.length === 0) return <div className="text-center py-12 text-slate-500 dark:text-slate-400">No listings currently available in the marketplace.</div>;
-        
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {listings.map(listing => (
-                    <ListingCard key={listing.id} listing={listing} onClick={() => setSelectedListing(listing)} />
-                ))}
-            </div>
-        );
+    useEffect(() => {
+        setForm(current => ({
+            ...current,
+            contact_info: current.contact_info || profile?.phone_number || '',
+        }));
+    }, [profile?.phone_number]);
+
+    const filteredProperties = useMemo(() => {
+        const normalizedSearch = search.trim().toLowerCase();
+        return propertyListings.filter(listing => {
+            if (activeFilter === 'rent' && listing.listing_type !== 'rent') return false;
+            if (activeFilter === 'sale' && listing.listing_type !== 'sale') return false;
+            if (activeFilter === 'products') return false;
+            if (!normalizedSearch) return true;
+
+            return [
+                listing.building_name,
+                listing.address,
+                listing.description,
+                listing.house_number,
+            ].some(value => value?.toLowerCase().includes(normalizedSearch));
+        });
+    }, [activeFilter, propertyListings, search]);
+
+    const filteredProducts = useMemo(() => {
+        const normalizedSearch = search.trim().toLowerCase();
+        if (activeFilter !== 'all' && activeFilter !== 'products') return [];
+        return productListings.filter(product => {
+            if (!normalizedSearch) return true;
+            return [
+                product.title,
+                product.category,
+                product.description,
+                product.location,
+                product.seller_name,
+            ].some(value => value?.toLowerCase().includes(normalizedSearch));
+        });
+    }, [activeFilter, productListings, search]);
+
+    const handleSellProduct = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setSubmitting(true);
+        setError(null);
+
+        try {
+            await createProductMarketplaceListing({
+                title: form.title.trim(),
+                description: form.description.trim(),
+                category: form.category.trim(),
+                price: Number(form.price),
+                condition: form.condition,
+                contact_info: form.contact_info.trim(),
+                location: form.location.trim(),
+                images: form.imageUrls.split('\n').map(item => item.trim()).filter(Boolean),
+            });
+
+            setSellModalOpen(false);
+            setForm({
+                title: '',
+                description: '',
+                category: '',
+                price: '',
+                contact_info: profile?.phone_number || '',
+                location: '',
+                condition: 'used',
+                imageUrls: '',
+            });
+            await loadMarketplace();
+        } catch (err: any) {
+            setError(err?.message || 'Could not create your product listing.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    const handleListProperty = () => {
-        navigate('/properties');
-    };
+    const totalVisible = filteredProperties.length + filteredProducts.length;
 
     return (
-        <div className="space-y-6 animate-fade-in pb-10">
-            {selectedListing && (
-                <ListingDetailsModal 
-                    listing={selectedListing} 
-                    onClose={() => setSelectedListing(null)} 
-                />
+        <div className="space-y-6">
+            <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_45%,#fff7ed_100%)] p-6 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.95)_0%,rgba(15,23,42,1)_55%,rgba(120,53,15,0.55)_100%)] md:p-8">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-3xl space-y-4">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-blue-700 dark:border-blue-500/30 dark:bg-slate-900/60 dark:text-blue-200">
+                            <Sparkles className="h-4 w-4" />
+                            Marketplace For Everyone
+                        </div>
+                        <div className="space-y-3">
+                            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-5xl">
+                                Rent a home, buy a property, or sell products from one marketplace.
+                            </h1>
+                            <p className="max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 md:text-base">
+                                Tenants can search for their next house, buyers can explore sale listings, and every resident can post useful products for the community.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                            onClick={() => isTenant ? setSellModalOpen(true) : navigate('/properties')}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900"
+                        >
+                            {isTenant ? 'Sell Your Product' : 'List Property'} <ArrowRight className="h-4 w-4" />
+                        </button>
+                        <button
+                            onClick={() => setSellModalOpen(true)}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-100 px-5 py-3 text-sm font-bold text-amber-800 transition hover:bg-amber-200 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+                        >
+                            {isTenant ? 'Post for Residents' : 'Sell Product'} <Store className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section className="space-y-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap gap-3">
+                        {filterMeta.map(item => {
+                            const isActive = item.id === activeFilter;
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveFilter(item.id)}
+                                    className={`rounded-2xl border px-4 py-3 text-left transition ${
+                                        isActive
+                                            ? 'border-slate-900 bg-slate-900 text-white shadow-lg dark:border-white dark:bg-white dark:text-slate-900'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <div className="text-sm font-bold">{item.label}</div>
+                                    <div className={`mt-1 text-xs ${isActive ? 'text-white/80 dark:text-slate-700' : 'text-slate-500 dark:text-slate-400'}`}>{item.hint}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:max-w-md">
+                        <Search className="h-4 w-4 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={event => setSearch(event.target.value)}
+                            placeholder="Search by place, property, category, seller..."
+                            className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                        />
+                        <Filter className="h-4 w-4 text-slate-300" />
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <span>{filteredProperties.filter(item => item.listing_type === 'rent').length} rent</span>
+                    <span>{filteredProperties.filter(item => item.listing_type === 'sale').length} sale</span>
+                    <span>{filteredProducts.length} products</span>
+                    <span>{totalVisible} visible</span>
+                </div>
+            </section>
+
+            {error ? (
+                <Card className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                    {error}
+                </Card>
+            ) : null}
+
+            {loading ? (
+                <Spinner className="min-h-[320px]" />
+            ) : (
+                <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                    {filteredProperties.map(listing => (
+                        <Card key={`property-${listing.id}`} className="group rounded-[1.75rem] border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                            <div className="overflow-hidden rounded-t-[1.75rem]">
+                                {getPropertyImage(listing) ? (
+                                    <img src={getPropertyImage(listing)} alt={listing.building_name} className="h-56 w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+                                ) : (
+                                    <div className="flex h-56 items-center justify-center bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                                        <Building2 className="h-14 w-14" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="space-y-4 p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                                            {getListingLabel(listing.listing_type)}
+                                        </div>
+                                        <h3 className="mt-3 text-lg font-black text-slate-900 dark:text-white">{listing.building_name}</h3>
+                                    </div>
+                                    <button onClick={() => void shareListingDetails({ title: listing.building_name, text: `${listing.address}\n${currency.format(listing.price)}`, url: listing.google_map_url })} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
+                                        <Share2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{listing.address}</span>
+                                </div>
+
+                                <div className="flex flex-wrap gap-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    <span className="inline-flex items-center gap-1"><BedDouble className="h-4 w-4" />{listing.bedrooms || 0} bed</span>
+                                    <span className="inline-flex items-center gap-1"><Building2 className="h-4 w-4" />{listing.area_sqft || 'NA'} sq ft</span>
+                                </div>
+
+                                <div className="flex items-end justify-between gap-4">
+                                    <div>
+                                        <div className="text-2xl font-black text-slate-900 dark:text-white">{currency.format(listing.price)}</div>
+                                        {listing.listing_type === 'rent' ? <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Per Month</div> : null}
+                                    </div>
+                                    <button onClick={() => setSelectedProperty(listing)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+
+                    {filteredProducts.map(product => (
+                        <Card key={product.id} className="group rounded-[1.75rem] border border-slate-200 bg-white p-0 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                            <div className="overflow-hidden rounded-t-[1.75rem]">
+                                {product.images?.[0] ? (
+                                    <img src={product.images[0]} alt={product.title} className="h-56 w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+                                ) : (
+                                    <div className="flex h-56 items-center justify-center bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-300">
+                                        <ShoppingBag className="h-14 w-14" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="space-y-4 p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                                            Product
+                                        </div>
+                                        <h3 className="mt-3 text-lg font-black text-slate-900 dark:text-white">{product.title}</h3>
+                                    </div>
+                                    <button onClick={() => void shareListingDetails({ title: product.title, text: `${product.category}\n${currency.format(product.price)}` })} className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300">
+                                        <Share2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                    <span>{product.category}</span>
+                                    <span>{conditionLabels[product.condition]}</span>
+                                    {product.location ? <span>{product.location}</span> : null}
+                                </div>
+
+                                <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{product.description}</p>
+
+                                <div className="flex items-end justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-1 text-2xl font-black text-slate-900 dark:text-white">
+                                            <IndianRupee className="h-5 w-5" />
+                                            {currency.format(product.price).replace('₹', '').trim()}
+                                        </div>
+                                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                            by {product.seller_name}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedProduct(product)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900">
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </section>
             )}
 
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-blue-900 dark:text-slate-200">Marketplace</h2>
-                    <p className="mt-1 text-slate-500 dark:text-slate-400">Buy and sell with confidence. Every listing is from a verified owner.</p>
-                </div>
-                <button 
-                    onClick={handleListProperty}
-                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors shrink-0 shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
-                >
-                    <TagIcon className="w-5 h-5" />
-                    List Your Property
-                </button>
-            </div>
-            
-            <SearchBar />
+            {!loading && totalVisible === 0 ? (
+                <Card className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/70">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        <Search className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-4 text-xl font-black text-slate-900 dark:text-white">No listings match this filter yet.</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-500 dark:text-slate-400">
+                        Try another filter, clear the search, list a property, or post a product for the community.
+                    </p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                        <button onClick={() => setActiveFilter('all')} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                            Show All
+                        </button>
+                        <button onClick={() => setSellModalOpen(true)} className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-600">
+                            Sell Product
+                        </button>
+                    </div>
+                </Card>
+            ) : null}
 
-            {renderContent()}
+            <PropertyDetailsModal listing={selectedProperty} onClose={() => setSelectedProperty(null)} />
+            <ProductDetailsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+
+            <Modal isOpen={sellModalOpen} onClose={() => setSellModalOpen(false)} title="Sell a Product" maxWidth="2xl">
+                <form onSubmit={handleSellProduct} className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <label className="space-y-2">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Product Name</span>
+                            <input value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} required className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                        <label className="space-y-2">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Category</span>
+                            <input value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} required placeholder="Furniture, Appliances, Bikes..." className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <label className="space-y-2">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Price</span>
+                            <input type="number" min="0" value={form.price} onChange={event => setForm(current => ({ ...current, price: event.target.value }))} required className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                        <label className="space-y-2">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Condition</span>
+                            <select value={form.condition} onChange={event => setForm(current => ({ ...current, condition: event.target.value as ProductCondition }))} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                                <option value="new">New</option>
+                                <option value="like_new">Like New</option>
+                                <option value="used">Used</option>
+                            </select>
+                        </label>
+                        <label className="space-y-2">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Phone / WhatsApp</span>
+                            <input value={form.contact_info} onChange={event => setForm(current => ({ ...current, contact_info: event.target.value }))} required className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                    </div>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Location</span>
+                        <input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="Area, landmark, pickup zone" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                    </label>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Description</span>
+                        <textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} required rows={4} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                    </label>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Image URLs</span>
+                        <textarea value={form.imageUrls} onChange={event => setForm(current => ({ ...current, imageUrls: event.target.value }))} rows={3} placeholder="One image URL per line" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+                    </label>
+
+                    <div className="flex flex-wrap justify-end gap-3">
+                        <button type="button" onClick={() => setSellModalOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={submitting} className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60">
+                            Publish Product
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };

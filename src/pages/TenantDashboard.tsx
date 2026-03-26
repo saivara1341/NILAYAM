@@ -9,18 +9,20 @@ import { HomeIcon, CreditCardIcon, WrenchIcon, BellIcon, CameraIcon, ShieldCheck
 import { RazorpayButton } from '@/components/payments/RazorpayButton';
 import { EmptyInboxIllustration, EmptyLedgerIllustration, QuietMaintenanceIllustration, WaitingHomeIllustration } from '@/components/ui/StateIllustrations';
 import { Link } from 'react-router-dom';
+import { Copy, Check } from 'lucide-react';
+import { copyText, openPhoneDialer, openWhatsAppChat } from '@/utils/sharing';
 
 const InfoCard: React.FC<{ title: string; value: string | number; subtext?: string; icon: React.ReactNode; children?: React.ReactNode; delay: string }> = ({ title, value, subtext, icon, children, delay }) => (
     <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: delay }}>
-        <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-4">
-                <div className="bg-blue-100 dark:bg-blue-900/40 p-4 rounded-2xl text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center space-x-3 sm:space-x-4">
+                <div className="rounded-2xl border border-blue-200/50 bg-blue-100 p-3 text-blue-600 shadow-sm dark:border-blue-800/50 dark:bg-blue-900/40 dark:text-blue-400 sm:p-4">
                     {React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6" })}
                 </div>
-                <div>
-                    <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">{title}</p>
-                    <p className="text-2xl font-black text-neutral-900 dark:text-white tracking-tight mt-1">{value}</p>
-                    {subtext && <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500 mt-0.5">{subtext}</p>}
+                <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">{title}</p>
+                    <p className="mt-1 truncate text-xl font-black tracking-tight text-neutral-900 dark:text-white sm:text-2xl">{value}</p>
+                    {subtext && <p className="mt-1 text-xs font-medium leading-5 text-neutral-400 dark:text-neutral-500">{subtext}</p>}
                 </div>
             </div>
             {children}
@@ -107,6 +109,112 @@ const ReminderPreview: React.FC<{ reminders: TenantDashboardData['reminders']; a
     </div>
 );
 
+const scoreBandStyles: Record<NonNullable<TenantDashboardData['scorecard']>['band'], string> = {
+    excellent: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    good: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    watchlist: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    high_risk: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+};
+
+const factorToneStyles: Record<'positive' | 'neutral' | 'negative', string> = {
+    positive: 'text-green-600 dark:text-green-400',
+    neutral: 'text-blue-600 dark:text-blue-400',
+    negative: 'text-red-600 dark:text-red-400'
+};
+
+const TenantScorecardPreview: React.FC<{ scorecard?: TenantDashboardData['scorecard'] }> = ({ scorecard }) => {
+    if (!scorecard) return null;
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-start justify-between gap-4 rounded-2xl border border-neutral-100 dark:border-neutral-700 bg-white dark:bg-neutral-800/50 px-4 py-4">
+                <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Tenant score</p>
+                    <p className="mt-2 text-4xl font-black tracking-tight text-neutral-900 dark:text-white">{scorecard.score}</p>
+                    <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{scorecard.explanation}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${scoreBandStyles[scorecard.band]}`}>
+                    {scorecard.band.replace('_', ' ')}
+                </span>
+            </div>
+            <div className="space-y-3">
+                {scorecard.factors.map((factor) => (
+                    <div key={factor.label} className="rounded-2xl border border-neutral-100 dark:border-neutral-700 bg-white dark:bg-neutral-800/50 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-neutral-900 dark:text-white">{factor.label}</p>
+                            <span className={`text-xs font-black uppercase tracking-widest ${factorToneStyles[factor.status]}`}>
+                                {factor.impact > 0 ? '+' : ''}{factor.impact}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{factor.description}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const TenantActivityLogPreview: React.FC<{ entries?: TenantDashboardData['activityLog'] }> = ({ entries }) => {
+    if (!entries?.length) {
+        return <p className="text-sm text-neutral-500 dark:text-neutral-400">Payments, reminders, agreement actions, and maintenance events will appear here.</p>;
+    }
+
+    return (
+        <div className="space-y-3">
+            {entries.slice(0, 6).map((entry) => (
+                <div key={entry.id} className="rounded-2xl border border-neutral-100 dark:border-neutral-700 bg-white dark:bg-neutral-800/50 px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white">{entry.title}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                            entry.tone === 'success'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                : entry.tone === 'warning'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        }`}>
+                            {entry.category}
+                        </span>
+                    </div>
+                    <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{entry.description}</p>
+                    <p className="mt-2 text-xs font-semibold text-neutral-400 dark:text-neutral-500">{new Date(entry.occurred_at).toLocaleString()}</p>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const buildUpiLink = (params: { upiId: string; payeeName?: string; amount: number; note: string }) => {
+    const search = new URLSearchParams({
+        pa: params.upiId,
+        pn: params.payeeName || 'Property Owner',
+        am: params.amount.toFixed(2),
+        cu: 'INR',
+        tn: params.note
+    });
+    return `upi://pay?${search.toString()}`;
+};
+
+const openUpiIntent = (app: 'gpay' | 'phonepe' | 'bhim' | 'paytm' | 'generic', link: string) => {
+    if (typeof window === 'undefined') return;
+
+    const query = link.split('?')[1] || '';
+    const appLinks = {
+        generic: link,
+        gpay: `tez://upi/pay?${query}`,
+        phonepe: `phonepe://pay?${query}`,
+        bhim: `bhim://upi/pay?${query}`,
+        paytm: `paytmmp://pay?${query}`
+    };
+
+    window.location.href = appLinks[app];
+
+    window.setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+            window.location.href = link;
+        }
+    }, 700);
+};
+
 const ManualPaymentCard: React.FC<{
     data: TenantDashboardData;
     tenantId: string;
@@ -114,10 +222,27 @@ const ManualPaymentCard: React.FC<{
 }> = ({ data, tenantId, onSubmitted }) => {
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const paymentMethods = data.landlordPaymentDetails;
 
     if (!data.nextPayment) return null;
+
+    const upiLink = paymentMethods?.upiId
+        ? buildUpiLink({
+            upiId: paymentMethods.upiId,
+            payeeName: paymentMethods.payeeName,
+            amount: data.nextPayment.amount,
+            note: `Rent for ${data.tenancyDetails.building_name} Unit ${data.tenancyDetails.house_number}`
+        })
+        : null;
+
+    const copyValue = async (key: string, value?: string | null) => {
+        const ok = await copyText(value);
+        if (!ok) return;
+        setCopiedField(key);
+        window.setTimeout(() => setCopiedField(null), 1400);
+    };
 
     const handleSubmit = async () => {
         if (!proofFile) {
@@ -156,17 +281,62 @@ const ManualPaymentCard: React.FC<{
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
                 Complete the transfer using the owner details below, then upload your screenshot or receipt so the owner can verify the credit in their account.
             </p>
+            <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">Next transfer</p>
+                        <p className="mt-2 text-3xl font-black text-emerald-950 dark:text-emerald-100">₹{data.nextPayment.amount.toLocaleString('en-IN')}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                        Due {new Date(data.nextPayment.due_date).toLocaleDateString()}
+                    </p>
+                </div>
+            </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {paymentMethods?.upiId && (
                     <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-4">
-                        <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">UPI ID</p>
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">UPI ID</p>
+                            <button type="button" onClick={() => void copyValue('upi', paymentMethods.upiId)} className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-bold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
+                                {copiedField === 'upi' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                {copiedField === 'upi' ? 'Copied' : 'Copy'}
+                            </button>
+                        </div>
                         <p className="mt-2 text-sm font-bold text-neutral-900 dark:text-white break-all">{paymentMethods.upiId}</p>
+                        {upiLink && (
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => openUpiIntent('gpay', upiLink)} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700">Google Pay</button>
+                                <button type="button" onClick={() => openUpiIntent('phonepe', upiLink)} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">PhonePe</button>
+                                <button type="button" onClick={() => openUpiIntent('bhim', upiLink)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white hover:bg-emerald-700">BHIM</button>
+                                <button type="button" onClick={() => openUpiIntent('paytm', upiLink)} className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-black text-white hover:bg-sky-700">Paytm</button>
+                                <a href={upiLink} className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-center text-xs font-black text-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white md:col-span-2">Direct UPI Intent</a>
+                            </div>
+                        )}
                     </div>
                 )}
                 {paymentMethods?.mobileNumber && (
                     <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-4">
-                        <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Owner Mobile</p>
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Owner Mobile</p>
+                            <button type="button" onClick={() => void copyValue('mobile', paymentMethods.mobileNumber)} className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-xs font-bold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200">
+                                {copiedField === 'mobile' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                {copiedField === 'mobile' ? 'Copied' : 'Copy'}
+                            </button>
+                        </div>
                         <p className="mt-2 text-sm font-bold text-neutral-900 dark:text-white">{paymentMethods.mobileNumber}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => openPhoneDialer(paymentMethods.mobileNumber)} className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs font-black text-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
+                                Call Owner
+                            </button>
+                            <button type="button" onClick={() => openWhatsAppChat(paymentMethods.mobileNumber, `Hi ${paymentMethods.payeeName || data.landlordContact?.name || 'Owner'}, I am contacting you from Nilayam regarding rent payment for ${data.tenancyDetails.building_name}, Unit ${data.tenancyDetails.house_number}.`)} className="rounded-xl bg-green-600 px-3 py-2 text-xs font-black text-white hover:bg-green-700">
+                                WhatsApp Owner
+                            </button>
+                        </div>
+                        {upiLink && (
+                            <button type="button" onClick={() => openUpiIntent('generic', upiLink)} className="mt-4 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                                Pay ₹{data.nextPayment.amount.toLocaleString('en-IN')} using any UPI app
+                            </button>
+                        )}
                     </div>
                 )}
                 {paymentMethods?.bankDetails?.accountNumber && (
@@ -176,11 +346,29 @@ const ManualPaymentCard: React.FC<{
                             <p className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">Bank Transfer</p>
                         </div>
                         <div className="mt-3 grid gap-2 md:grid-cols-2 text-sm">
-                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Account Holder:</span> {paymentMethods.bankDetails.accountHolder || 'Not set'}</p>
+                            <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Account Holder:</span> {paymentMethods.bankDetails.accountHolder || paymentMethods.payeeName || 'Not set'}</p>
                             <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Bank:</span> {paymentMethods.bankDetails.bankName || 'Not set'}</p>
                             <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">Account No:</span> {paymentMethods.bankDetails.accountNumber}</p>
                             <p className="text-neutral-700 dark:text-neutral-300"><span className="font-semibold">IFSC:</span> {paymentMethods.bankDetails.ifsc || 'Not set'}</p>
                         </div>
+                    </div>
+                )}
+                {paymentMethods?.settlementPreference && (
+                    <div className="rounded-2xl border border-sky-200 dark:border-sky-900/40 bg-sky-50 dark:bg-sky-900/10 p-4 md:col-span-2">
+                        <p className="text-xs font-black uppercase tracking-widest text-sky-700 dark:text-sky-300">Settlement Flow</p>
+                        <p className="mt-2 text-sm text-sky-900 dark:text-sky-100">
+                            {paymentMethods.settlementPreference === 'direct_owner'
+                                ? 'This tenancy is intended for direct owner settlement. Manual UPI and bank transfers already go straight to the owner details shown here.'
+                                : 'This tenancy is configured for platform-side settlement review.'}
+                        </p>
+                        {paymentMethods.razorpayRouteEnabled && paymentMethods.razorpayLinkedAccountId && (
+                            <p className="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                                Linked account reference: {paymentMethods.razorpayLinkedAccountId}
+                            </p>
+                        )}
+                        {paymentMethods.settlementNotes && (
+                            <p className="mt-2 text-sm text-sky-800 dark:text-sky-200">{paymentMethods.settlementNotes}</p>
+                        )}
                     </div>
                 )}
                 {paymentMethods?.qrCodeUrl && (
@@ -341,18 +529,36 @@ const TenantDashboard: React.FC = () => {
     const hasDuePayment = Boolean(data.nextPayment);
     const hasOpenMaintenance = data.openMaintenanceRequests.length > 0;
     const agreementPendingAck = Boolean(data.agreement && !data.lifecycle?.agreement_acknowledged_at);
+    const firstName = profile?.full_name?.split(' ')[0] || 'Resident';
+    const ownerContactNumber = data.landlordContact?.phone_number || data.landlordPaymentDetails?.mobileNumber;
+    const ownerName = data.landlordContact?.name || data.landlordPaymentDetails?.payeeName || 'Property Owner';
 
     return (
-            <div className="space-y-8 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
-                <div>
-                    <h2 className="text-3xl md:text-5xl font-black text-neutral-900 dark:text-white tracking-tight leading-tight">
-                        Namaste, {profile?.full_name?.split(' ')[0]}!
-                    </h2>
-                    <p className="text-neutral-500 dark:text-neutral-400 mt-1 text-base md:text-xl font-medium">Your sanctuary management suite.</p>
+            <div className="space-y-6 animate-fade-in md:space-y-8">
+            <div className="overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-[linear-gradient(135deg,#eff6ff,#ffffff_52%,#ecfeff)] p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] dark:border-neutral-800 dark:bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] md:p-7">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between animate-fade-in-up">
+                    <div className="max-w-2xl">
+                        <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-600 dark:text-blue-300">Tenant dashboard</p>
+                        <h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-neutral-900 dark:text-white md:text-5xl">
+                            Namaste, {firstName}!
+                        </h2>
+                        <p className="mt-2 text-sm font-medium leading-6 text-neutral-600 dark:text-neutral-300 md:text-lg">
+                            Rent, updates, proof uploads, documents, and house details are arranged around what you need to do first.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 md:min-w-[260px]">
+                        <div className="rounded-[1.4rem] border border-white/70 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Next due</p>
+                            <p className="mt-2 text-lg font-black text-neutral-900 dark:text-white">{data.nextPayment ? `₹${data.nextPayment.amount.toLocaleString('en-IN')}` : 'All clear'}</p>
+                        </div>
+                        <div className="rounded-[1.4rem] border border-white/70 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Residence</p>
+                            <p className="mt-2 text-lg font-black text-neutral-900 dark:text-white">{data.tenancyDetails.house_number}</p>
+                        </div>
+                    </div>
                 </div>
                 {loading && (
-                    <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/10 dark:text-blue-300">
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/10 dark:text-blue-300">
                         <Spinner />
                         Refreshing latest details
                     </div>
@@ -360,7 +566,7 @@ const TenantDashboard: React.FC = () => {
             </div>
 
             {(hasDuePayment || hasOpenMaintenance || agreementPendingAck) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {hasDuePayment && (
                         <Card className="border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10">
                             <p className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">Payment Alert</p>
@@ -400,14 +606,40 @@ const TenantDashboard: React.FC = () => {
 
             {/* BhimPaymentGateway removed */}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6">
                 <InfoCard
                     title="My Residence"
                     value={data.tenancyDetails.building_name}
                     subtext={`Unit No. ${data.tenancyDetails.house_number}`}
                     icon={<HomeIcon />}
                     delay="100ms"
-                />
+                >
+                    <div className="flex flex-col items-end gap-2 text-right">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Owner</p>
+                            <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white">{ownerName}</p>
+                            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{ownerContactNumber || 'Contact not available'}</p>
+                        </div>
+                        {ownerContactNumber && (
+                            <div className="flex flex-wrap justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => openPhoneDialer(ownerContactNumber)}
+                                    className="rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-[11px] font-black text-neutral-900 dark:text-white hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                >
+                                    Call
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openWhatsAppChat(ownerContactNumber, `Hi ${ownerName}, I am reaching out from Nilayam about ${data.tenancyDetails.building_name}, Unit ${data.tenancyDetails.house_number}.`)}
+                                    className="rounded-xl bg-green-600 px-3 py-2 text-[11px] font-black text-white hover:bg-green-700"
+                                >
+                                    WhatsApp
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </InfoCard>
                 <InfoCard
                     title="Next Payment"
                     value={data.nextPayment ? `₹${data.nextPayment.amount.toLocaleString()}` : 'All Clear!'}
@@ -429,6 +661,7 @@ const TenantDashboard: React.FC = () => {
                             paymentType="rent"
                             houseId={data.tenancyDetails.house_id}
                             tenantId={profile?.id || ''}
+                            paymentId={data.nextPayment.id}
                             onSuccess={() => refreshData(true)}
                             buttonText="PAY NOW"
                             disabledReason="Razorpay needs a live backend API and frontend key configuration."
@@ -452,8 +685,8 @@ const TenantDashboard: React.FC = () => {
                 />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-8">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:gap-8">
+                <div className="space-y-6 xl:space-y-8">
                     {data.nextPayment && !supportsRazorpay && (
                         <ManualPaymentCard data={data} tenantId={profile?.id || ''} onSubmitted={() => refreshData(true)} />
                     )}
@@ -490,9 +723,23 @@ const TenantDashboard: React.FC = () => {
                             )}
                         </div>
                     </Card>
+
+                    <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '530ms' } as any}>
+                        <h3 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center gap-2">
+                            <BellIcon className="w-6 h-6 text-indigo-500" /> Agreement & Reminder Desk
+                        </h3>
+                        <ReminderPreview reminders={data.reminders} agreement={data.agreement} />
+                    </Card>
+
+                    <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '550ms' } as any}>
+                        <h3 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center gap-2">
+                            <ShieldLockIcon className="w-6 h-6 text-blue-600" /> Tenant Scorecard
+                        </h3>
+                        <TenantScorecardPreview scorecard={data.scorecard} />
+                    </Card>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-6 xl:space-y-8">
                     <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '560ms' } as any}>
                         <h3 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center gap-2">
                             <CreditCardIcon className="w-6 h-6 text-blue-500" /> Rent & Utility Ledger
@@ -529,12 +776,13 @@ const TenantDashboard: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '780ms' } as any}>
+                    <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: '740ms' } as any}>
                         <h3 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center gap-2">
-                            <BellIcon className="w-6 h-6 text-indigo-500" /> Agreement & Reminder Desk
+                            <CheckCircleIcon className="w-6 h-6 text-emerald-600" /> Tenant Activity Log
                         </h3>
-                        <ReminderPreview reminders={data.reminders} agreement={data.agreement} />
+                        <TenantActivityLogPreview entries={data.activityLog} />
                     </Card>
+
                 </div>
             </div>
 

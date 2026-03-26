@@ -24,6 +24,8 @@ import Card from '../components/ui/Card';
 import DocumentManager from '../components/tenants/DocumentManager';
 import LeaseGeneratorModal from '../components/tenants/LeaseGeneratorModal';
 import Spinner from '../components/ui/Spinner';
+import { Check, Copy } from 'lucide-react';
+import { copyText, openPhoneDialer, openWhatsAppChat } from '../utils/sharing';
 
 const paymentStatusStyles: Record<Payment['status'], string> = {
     paid: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
@@ -49,23 +51,45 @@ const monthKey = (value: Date | string) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const TenantScorecard: React.FC<{ tenant: TenantProfile }> = ({ tenant }) => (
-    <Card>
-        <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Tenant Scorecard</h3>
-        <div className="text-center mb-4">
-            <div className="inline-block relative p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-full">
-                <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">{tenant.tenant_score ?? 0}</div>
-                <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Trust Score</div>
+const TenantScorecard: React.FC<{ tenant: TenantProfile }> = ({ tenant }) => {
+    const scorecard = tenant.scorecard;
+
+    if (!scorecard) {
+        return (
+            <Card>
+                <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Tenant Scorecard</h3>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">The scorecard will appear once enough payment, agreement, and verification signals are available.</p>
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Tenant Scorecard</h3>
+            <div className="text-center mb-4">
+                <div className="inline-block relative p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-full">
+                    <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">{scorecard.score}</div>
+                    <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Trust Score</div>
+                </div>
+                <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">{scorecard.explanation}</p>
             </div>
-        </div>
-        <div className="space-y-3 text-sm">
-            <div className="flex justify-between items-center p-2 rounded-md bg-neutral-50 dark:bg-neutral-800/50"><span className="text-neutral-500 dark:text-neutral-400">Payment Reliability</span><span className="font-bold text-green-600">Excellent</span></div>
-            <div className="flex justify-between items-center p-2 rounded-md bg-neutral-50 dark:bg-neutral-800/50"><span className="text-neutral-500 dark:text-neutral-400">Complaint History</span><span className="font-bold text-green-600">Low</span></div>
-            <div className="flex justify-between items-center p-2 rounded-md bg-neutral-50 dark:bg-neutral-800/50"><span className="text-neutral-500 dark:text-neutral-400">ID Verification</span><span className="font-bold text-green-600">Verified</span></div>
-        </div>
-        <p className="text-xs text-neutral-400 mt-4 text-center">Score is generated from payment consistency, complaint trend, and document readiness.</p>
-    </Card>
-);
+            <div className="space-y-3 text-sm">
+                {scorecard.factors.map((factor) => (
+                    <div key={factor.label} className="flex justify-between items-center gap-3 p-3 rounded-md bg-neutral-50 dark:bg-neutral-800/50">
+                        <div>
+                            <span className="text-neutral-700 dark:text-neutral-200 font-semibold">{factor.label}</span>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{factor.description}</p>
+                        </div>
+                        <span className={`font-bold ${factor.status === 'positive' ? 'text-green-600' : factor.status === 'negative' ? 'text-red-600' : 'text-blue-600'}`}>
+                            {factor.impact > 0 ? '+' : ''}{factor.impact}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            <p className="text-xs text-neutral-400 mt-4 text-center">Higher scores come from timely payments, verified identity, completed agreement steps, and lower follow-up pressure. Low scores come from overdue payments, failed verifications, repeated reminders, and unresolved issues.</p>
+        </Card>
+    );
+};
 
 const PaymentHistory: React.FC<{ payments: Payment[] }> = ({ payments }) => (
     <div className="overflow-x-auto">
@@ -126,6 +150,36 @@ const ChargeLedgerTable: React.FC<{ ledger: ChargeLedgerEntry[] }> = ({ ledger }
     </div>
 );
 
+const ActivityLogCard: React.FC<{ tenant: TenantProfile }> = ({ tenant }) => (
+    <Card>
+        <h3 className="text-xl font-semibold mb-4 text-neutral-800 dark:text-neutral-200">Tenant Activity Log</h3>
+        {(tenant.activityLog || []).length === 0 ? (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Payments, reminder escalations, move-in events, and agreement actions will appear here.</p>
+        ) : (
+            <div className="space-y-3">
+                {tenant.activityLog?.map((entry) => (
+                    <div key={entry.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-neutral-900 dark:text-white">{entry.title}</p>
+                            <span className={`px-2 py-1 text-[10px] font-semibold rounded-full ${
+                                entry.tone === 'success'
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                    : entry.tone === 'warning'
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            }`}>
+                                {formatLabel(entry.category)}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{entry.description}</p>
+                        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-500">{new Date(entry.occurred_at).toLocaleString()}</p>
+                    </div>
+                ))}
+            </div>
+        )}
+    </Card>
+);
+
 const TenantDetailPage: React.FC = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
     const [tenant, setTenant] = useState<TenantProfile | null>(null);
@@ -158,6 +212,8 @@ const TenantDetailPage: React.FC = () => {
         possessionHandoverOn: '',
         agreementAcceptanceNote: ''
     });
+    const [copiedPhone, setCopiedPhone] = useState(false);
+    const [copiedOwnerPhone, setCopiedOwnerPhone] = useState(false);
 
     useEffect(() => {
         if (!tenantId) return;
@@ -419,6 +475,24 @@ const TenantDetailPage: React.FC = () => {
         }
     };
 
+    const handleCopyPhone = async () => {
+        if (!tenant?.phone_number) return;
+        const ok = await copyText(tenant.phone_number);
+        if (ok) {
+            setCopiedPhone(true);
+            window.setTimeout(() => setCopiedPhone(false), 1200);
+        }
+    };
+
+    const handleCopyOwnerPhone = async () => {
+        if (!tenant?.owner_phone_number) return;
+        const ok = await copyText(tenant.owner_phone_number);
+        if (ok) {
+            setCopiedOwnerPhone(true);
+            window.setTimeout(() => setCopiedOwnerPhone(false), 1200);
+        }
+    };
+
     if (loading) return <div className="text-center p-8"><Spinner /></div>;
     if (error && !tenant) return <div className="text-red-500 bg-red-100 p-4 rounded-md">Error: {error}</div>;
     if (!tenant) return <div className="text-center p-8">Tenant not found.</div>;
@@ -462,6 +536,7 @@ const TenantDetailPage: React.FC = () => {
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Unit:</strong> {tenant.house_number}</p>
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Parking Slot:</strong> {tenant.parking_slot || 'N/A'}</p>
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Phone:</strong> {tenant.phone_number}</p>
+                            {tenant.owner_phone_number && <p><strong className="text-neutral-500 dark:text-neutral-400">Owner Contact:</strong> {tenant.owner_name || 'Property Owner'} • {tenant.owner_phone_number}</p>}
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Rent:</strong> ₹{tenant.rent_amount?.toLocaleString('en-IN')}/month</p>
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Move-In:</strong> {tenant.lifecycle?.move_in_date ? new Date(tenant.lifecycle.move_in_date).toLocaleDateString() : 'Not recorded'}</p>
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Advance / Deposit:</strong> ₹{Number(tenant.lifecycle?.advance_amount || 0).toLocaleString('en-IN')}</p>
@@ -469,7 +544,40 @@ const TenantDetailPage: React.FC = () => {
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Lease Ends:</strong> {tenant.lease_end_date ? new Date(tenant.lease_end_date).toLocaleDateString() : 'N/A'}</p>
                             <p><strong className="text-neutral-500 dark:text-neutral-400">Agreement Ack:</strong> {tenant.lifecycle?.agreement_acknowledged_at ? new Date(tenant.lifecycle.agreement_acknowledged_at).toLocaleString() : 'Pending acknowledgement'}</p>
                         </div>
+                        {tenant.owner_phone_number && (
+                            <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-blue-900/10">
+                                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Owner Quick Access</p>
+                                <p className="mt-2 text-lg font-black text-neutral-900 dark:text-white">{tenant.owner_name || 'Property Owner'}</p>
+                                <p className="mt-1 text-sm font-medium text-neutral-500 dark:text-neutral-400">{tenant.owner_phone_number}</p>
+                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    <button onClick={() => openPhoneDialer(tenant.owner_phone_number)} className="rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white px-4 py-3 text-sm font-black transition hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                                        Call Owner
+                                    </button>
+                                    <button onClick={() => openWhatsAppChat(tenant.owner_phone_number, `Hi ${tenant.owner_name || 'Owner'}, I am contacting you regarding ${tenant.building_name}, Unit ${tenant.house_number}.`)} className="rounded-xl bg-green-600 text-white px-4 py-3 text-sm font-black transition hover:bg-green-700">
+                                        WhatsApp Owner
+                                    </button>
+                                    <button onClick={() => void handleCopyOwnerPhone()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white px-4 py-3 text-sm font-black transition hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                                        {copiedOwnerPhone ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                        {copiedOwnerPhone ? 'Copied' : 'Copy Owner'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         <div className="mt-6 grid grid-cols-1 gap-3">
+                            {tenant.phone_number && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <button onClick={() => openPhoneDialer(tenant.phone_number)} className="rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white px-4 py-3 text-sm font-black transition hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                                        Call Tenant
+                                    </button>
+                                    <button onClick={() => openWhatsAppChat(tenant.phone_number, `Hi ${tenant.name || 'there'}, this is from Nilayam regarding your tenancy.`)} className="rounded-xl bg-green-600 text-white px-4 py-3 text-sm font-black transition hover:bg-green-700">
+                                        WhatsApp Tenant
+                                    </button>
+                                    <button onClick={() => void handleCopyPhone()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white px-4 py-3 text-sm font-black transition hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                                        {copiedPhone ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                        {copiedPhone ? 'Copied' : 'Copy Number'}
+                                    </button>
+                                </div>
+                            )}
                             <button onClick={handleSendReminder} disabled={isSending} className="w-full btn btn-primary">
                                 {isSending ? 'Working...' : 'Send Rent Reminder'}
                             </button>
@@ -480,6 +588,7 @@ const TenantDetailPage: React.FC = () => {
                     </Card>
 
                     <TenantScorecard tenant={tenant} />
+                    <ActivityLogCard tenant={tenant} />
                 </div>
 
                 <div className="lg:col-span-2 space-y-6">

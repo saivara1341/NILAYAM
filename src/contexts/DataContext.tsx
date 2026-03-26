@@ -149,11 +149,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchId = ++activeDashboardFetchId.current;
     dashboardRequestRef.current = (async () => {
       try {
-        console.log("DataContext: Refreshing dashboard data...");
         const [summary, financials, occupancy] = await Promise.all([
-          getDashboardSummary(),
-          getFinancialSummary(),
-          getOccupancySummary()
+          getDashboardSummary(user.id),
+          getFinancialSummary(user.id),
+          getOccupancySummary(user.id)
         ]);
 
         if (activeDashboardFetchId.current !== fetchId) return;
@@ -220,7 +219,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchId = ++activeTenantFetchId.current;
     tenantRequestRef.current = (async () => {
       try {
-        console.log("DataContext: Refreshing tenant dashboard data...");
         const data = await getTenantDashboardData();
 
         if (activeTenantFetchId.current !== fetchId) return;

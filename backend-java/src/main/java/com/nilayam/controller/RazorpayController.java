@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3006"})
+@CrossOrigin(origins = "${cors.allowed-origins}")
 public class RazorpayController {
 
     @Value("${razorpay.key.id}")
@@ -37,6 +37,9 @@ public class RazorpayController {
         if (razorpayClient == null) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Razorpay is not configured on the server"));
         }
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Amount must be greater than zero"));
+        }
         try {
             JSONObject orderRequest = new JSONObject();
             orderRequest.put("amount", Math.round(request.getAmount() * 100)); // amount in the smallest currency unit
@@ -48,7 +51,13 @@ public class RazorpayController {
             }
 
             Order order = razorpayClient.orders.create(orderRequest);
-            return ResponseEntity.ok(order.toString());
+            return ResponseEntity.ok(Map.of(
+                "id", order.get("id"),
+                "amount", order.get("amount"),
+                "currency", order.get("currency"),
+                "receipt", order.get("receipt"),
+                "status", order.get("status")
+            ));
         } catch (RazorpayException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to create Razorpay order", "details", e.getMessage()));
         }
@@ -62,6 +71,10 @@ public class RazorpayController {
         String orderId = data.get("razorpay_order_id");
         String paymentId = data.get("razorpay_payment_id");
         String signature = data.get("razorpay_signature");
+
+        if (orderId == null || orderId.isBlank() || paymentId == null || paymentId.isBlank() || signature == null || signature.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Missing Razorpay verification fields"));
+        }
 
         try {
             JSONObject attributes = new JSONObject();

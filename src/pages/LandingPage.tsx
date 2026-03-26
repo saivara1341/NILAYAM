@@ -125,89 +125,107 @@ const HeroVisual: React.FC = () => (
         <FloatingChip icon={<CreditCardIcon className="h-4 w-4" />} label="Collections" className="right-4 top-6 hidden sm:block animate-float-mid" />
         <FloatingChip icon={<WrenchIcon className="h-4 w-4" />} label="Helpdesk" className="left-10 bottom-24 hidden lg:block animate-float-fast" />
         <FloatingChip icon={<StoreIcon className="h-4 w-4" />} label="Services" className="right-0 bottom-10 hidden lg:block animate-float-soft" />
-        <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] p-3 shadow-[0_35px_90px_rgba(15,23,42,0.30)] sm:rounded-[2.5rem] sm:p-6">
+        <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] p-3 shadow-[0_35px_90px_rgba(15,23,42,0.30)] sm:rounded-[2.5rem] sm:p-5">
             <div className="rounded-[1.6rem] border border-white/10 bg-white/5 p-3 sm:rounded-[2rem] sm:p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-600/30">
                             <LogoIcon className="h-6 w-6" />
                         </div>
-                        <div>
-                            <p className="text-xs font-black uppercase tracking-[0.3em] text-sky-200">Nilayam</p>
-                            <p className="text-sm text-slate-400">Property operating system</p>
+                        <div className="h-4 w-28 rounded-full bg-white/10 sm:w-36" />
+                    </div>
+                    <div className="h-8 w-16 rounded-full bg-emerald-400/15" />
+                </div>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
+                    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 sm:rounded-[1.8rem] sm:p-5">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="h-3 w-28 rounded-full bg-white/10" />
+                                <div className="mt-3 h-8 w-40 rounded-full bg-white/20 sm:w-48" />
+                                <div className="mt-3 space-y-2">
+                                    <div className="h-3 w-44 rounded-full bg-white/10" />
+                                    <div className="h-3 w-36 rounded-full bg-white/10" />
+                                </div>
+                            </div>
+                            <div className="rounded-2xl bg-sky-400/10 p-3 text-sky-300">
+                                <InsightsIcon className="h-7 w-7" />
+                            </div>
+                        </div>
+                        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {[
+                                { label: 'Income', value: '₹12.4L' },
+                                { label: 'Tickets', value: '08' },
+                                { label: 'Renewals', value: '03' },
+                                { label: 'Ready', value: '12' }
+                            ].map((item) => (
+                                <div key={item.label} className="min-w-0 rounded-2xl bg-slate-950/80 p-3">
+                                    <div className="h-2.5 w-10 rounded-full bg-white/10 sm:w-12" />
+                                    <div className="mt-3 h-5 w-12 rounded-full bg-white/20 sm:w-16" />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-5 rounded-[1.4rem] border border-white/10 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(16,185,129,0.08))] p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-2xl bg-emerald-400/10 p-3 text-emerald-300"><FinancialAnalyticsIcon className="h-5 w-5" /></div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="h-2.5 w-16 rounded-full bg-white/10" />
+                                    <div className="mt-2 h-4 w-32 rounded-full bg-white/20" />
+                                    <div className="mt-2 space-y-2">
+                                        <div className="h-2.5 w-full rounded-full bg-white/10" />
+                                        <div className="h-2.5 w-4/5 rounded-full bg-white/10" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex h-20 items-end gap-2">{[28, 44, 39, 61, 56, 74].map((value, index) => <div key={index} className="flex-1 rounded-t-full bg-[linear-gradient(180deg,#38bdf8,#0f172a)]" style={{ height: `${value}%` }} />)}</div>
                         </div>
                     </div>
-                    <div className="rounded-full bg-emerald-400/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-emerald-300">Live</div>
-                </div>
-                <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-                    <div className="space-y-4">
-                        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 sm:rounded-[1.8rem] sm:p-5">
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">Control Room</p>
-                                    <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">94% occupancy</h3>
-                                    <p className="mt-2 text-sm leading-6 text-slate-400">Collections, leasing, and operations in a single view.</p>
-                                </div>
-                                <div className="rounded-2xl bg-sky-400/10 p-3 text-sky-300">
-                                    <InsightsIcon className="h-7 w-7" />
-                                </div>
+                    <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(15,23,42,0.42))] p-4 sm:rounded-[1.8rem] sm:p-5">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 pr-3">
+                                <div className="h-2.5 w-20 rounded-full bg-white/10" />
+                                <div className="mt-3 h-5 w-32 rounded-full bg-white/20 sm:w-40" />
                             </div>
-                            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div className="min-w-0 rounded-2xl bg-slate-950/80 p-3"><p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em]">Income</p><p className="mt-2 truncate text-lg font-black text-white">₹12.4L</p></div>
-                                <div className="min-w-0 rounded-2xl bg-slate-950/80 p-3"><p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em]">Tickets</p><p className="mt-2 truncate text-lg font-black text-white">08</p></div>
-                                <div className="min-w-0 rounded-2xl bg-slate-950/80 p-3"><p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-[11px] sm:tracking-[0.16em]">Renewals</p><p className="mt-2 truncate text-lg font-black text-white">03</p></div>
-                            </div>
+                            <div className="rounded-2xl bg-white/10 p-3 text-sky-300"><HomeIcon className="h-5 w-5" /></div>
                         </div>
-                        <div className="grid gap-4">
-                            <div className="min-w-0 rounded-[1.4rem] border border-white/10 bg-white/5 p-4 sm:rounded-[1.6rem]">
+                        <div className="mt-5 space-y-3">
+                            <div className="rounded-[1.4rem] bg-slate-950/80 p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="h-2.5 w-16 rounded-full bg-white/10" />
+                                        <div className="mt-3 h-7 w-28 rounded-full bg-white/20" />
+                                    </div>
+                                    <span className="h-8 w-24 rounded-full bg-emerald-400/15" />
+                                </div>
+                            </div>
+                            <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
                                 <div className="flex items-start gap-3">
                                     <div className="rounded-2xl bg-violet-400/10 p-3 text-violet-300"><TenantTrackingIcon className="h-5 w-5" /></div>
-                                    <div className="min-w-0 flex-1 overflow-hidden">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:text-xs sm:tracking-[0.22em]">Onboarding</p>
-                                        <p className="mt-1 break-words text-xs font-bold leading-5 text-white sm:text-sm">Resident setup</p>
+                                    <div className="min-w-0">
+                                        <div className="h-2.5 w-20 rounded-full bg-white/10" />
+                                        <div className="mt-2 h-4 w-24 rounded-full bg-white/20" />
                                     </div>
                                 </div>
-                                <div className="mt-4 space-y-2">{['KYC verified', 'Lease signed', 'Autopay enabled'].map((item) => <div key={item} className="flex items-center gap-2 rounded-2xl bg-slate-950/75 px-3 py-2 text-sm text-slate-200"><CheckCircleIcon className="h-4 w-4 text-emerald-300" /><span>{item}</span></div>)}</div>
+                                <div className="mt-4 space-y-2">{['a', 'b', 'c'].map((item) => <div key={item} className="flex items-center gap-2 rounded-2xl bg-slate-950/75 px-3 py-2 text-sm text-slate-200"><CheckCircleIcon className="h-4 w-4 text-emerald-300" /><div className="h-3 w-24 rounded-full bg-white/15" /></div>)}</div>
                             </div>
-                            <div className="min-w-0 rounded-[1.4rem] border border-white/10 bg-white/5 p-4 sm:rounded-[1.6rem]">
-                                <div className="flex items-start gap-3">
-                                    <div className="rounded-2xl bg-emerald-400/10 p-3 text-emerald-300"><FinancialAnalyticsIcon className="h-5 w-5" /></div>
-                                    <div className="min-w-0 flex-1 overflow-hidden">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 sm:text-xs sm:tracking-[0.22em]">Forecast</p>
-                                        <p className="mt-1 break-words text-xs font-bold leading-5 text-white sm:text-sm">Cashflow intelligence</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="min-w-0 rounded-[1.3rem] bg-white/5 p-4 text-center"><CalendarDaysIcon className="mx-auto h-5 w-5 text-cyan-300" /><div className="mx-auto mt-3 h-2.5 w-16 rounded-full bg-white/10" /></div>
+                                <div className="min-w-0 rounded-[1.3rem] bg-white/5 p-4 text-center"><MessageSquareIcon className="mx-auto h-5 w-5 text-violet-300" /><div className="mx-auto mt-3 h-2.5 w-16 rounded-full bg-white/10" /></div>
+                            </div>
+                            <div className="rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(20,184,166,0.12))] p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="h-2.5 w-20 rounded-full bg-white/10" />
+                                        <div className="mt-2 h-4 w-28 rounded-full bg-white/20" />
                                     </div>
+                                    <SparklesIcon className="h-5 w-5 text-amber-300" />
                                 </div>
-                                <div className="mt-4 flex h-20 items-end gap-2">{[28, 44, 39, 61, 56, 74].map((value, index) => <div key={index} className="flex-1 rounded-t-full bg-[linear-gradient(180deg,#38bdf8,#0f172a)]" style={{ height: `${value}%` }} />)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 sm:rounded-[1.8rem] sm:p-5">
-                            <div className="flex items-center justify-between">
-                                <div className="min-w-0 pr-3"><p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">Resident App</p><h4 className="mt-2 text-lg font-black leading-6 text-white sm:text-xl">Everything in one place</h4></div>
-                                <div className="rounded-2xl bg-white/10 p-3 text-sky-300"><HomeIcon className="h-5 w-5" /></div>
-                            </div>
-                            <div className="mt-5 space-y-3">
-                                <div className="rounded-[1.4rem] bg-slate-950/80 p-4">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Rent Due</p>
-                                    <div className="mt-2 flex items-center justify-between"><p className="text-2xl font-black text-white">₹25,000</p><span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Autopay</span></div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="min-w-0 rounded-[1.3rem] bg-white/5 p-4 text-center"><CalendarDaysIcon className="mx-auto h-5 w-5 text-cyan-300" /><p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 sm:text-[11px] sm:tracking-[0.2em]">Visitors</p></div>
-                                    <div className="min-w-0 rounded-[1.3rem] bg-white/5 p-4 text-center"><MessageSquareIcon className="mx-auto h-5 w-5 text-violet-300" /><p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 sm:text-[11px] sm:tracking-[0.16em]">Community</p></div>
+                                <div className="mt-4 space-y-3">
+                                    {[
+                                        { icon: <BellIcon className="h-4 w-4" />, title: 'Send maintenance notice' },
+                                        { icon: <CreditCardIcon className="h-4 w-4" />, title: 'Review pending payments' }
+                                    ].map((item) => <div key={item.title} className="flex items-start gap-3 rounded-2xl bg-slate-950/70 px-3 py-3"><div className="rounded-xl bg-white/5 p-2 text-sky-300">{item.icon}</div><div className="min-w-0 flex-1"><div className="h-3.5 w-28 rounded-full bg-white/20" /><div className="mt-2 h-2.5 w-24 rounded-full bg-white/10" /></div></div>)}
                                 </div>
                             </div>
-                        </div>
-                        <div className="rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(20,184,166,0.12))] p-4 sm:rounded-[1.8rem] sm:p-5">
-                            <div className="flex items-center justify-between">
-                                <div className="min-w-0 pr-3"><p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">Action Queue</p><h4 className="mt-2 text-lg font-black leading-6 text-white sm:text-xl">Today’s priorities</h4></div>
-                                <SparklesIcon className="h-5 w-5 text-amber-300" />
-                            </div>
-                            <div className="mt-4 space-y-3">{[
-                                { icon: <BellIcon className="h-4 w-4" />, title: 'Send maintenance notice' },
-                                { icon: <CreditCardIcon className="h-4 w-4" />, title: 'Review pending payments' },
-                                { icon: <StoreIcon className="h-4 w-4" />, title: 'Approve local vendor' }
-                            ].map((item) => <div key={item.title} className="flex items-start gap-3 rounded-2xl bg-slate-950/70 px-3 py-3"><div className="rounded-xl bg-white/5 p-2 text-sky-300">{item.icon}</div><div className="min-w-0"><p className="text-sm font-bold leading-5 text-white">{item.title}</p><p className="text-xs leading-5 text-slate-500">Suggested by operational insights</p></div></div>)}</div>
                         </div>
                     </div>
                 </div>
@@ -284,7 +302,7 @@ const LandingPage: React.FC = () => {
     const displayedFeatures = activeTab === 'owners' ? ownerFeatures : tenantFeatures;
 
     return (
-        <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fafc_0%,#eef4ff_26%,#ffffff_56%,#f8fafc_100%)] text-slate-950 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] dark:text-white">
+        <div className="ornate-shell min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fafc_0%,#eef4ff_26%,#ffffff_56%,#f8fafc_100%)] text-slate-950 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] dark:text-white">
             <nav className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/80 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75">
                 <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-24 lg:px-8">
                     <Link to="/" className="flex items-center gap-3">
@@ -317,24 +335,24 @@ const LandingPage: React.FC = () => {
                     <div className="absolute right-0 top-20 -z-10 h-72 w-72 rounded-full bg-violet-400/10 blur-3xl" />
                     <div className="absolute bottom-0 left-0 -z-10 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
 
-                    <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+                    <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-14">
                         <Reveal className="max-w-2xl">
                             <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/90 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-sky-700 shadow-lg shadow-sky-100 dark:border-sky-400/20 dark:bg-white/5 dark:text-sky-300 dark:shadow-none">
                                 <SparklesIcon className="h-4 w-4" />
                                 {text('landing.tagline', 'Modern Property Operations')}
                             </div>
-                            <h1 className={`mt-6 text-5xl font-black leading-[0.95] tracking-tight text-slate-950 dark:text-white sm:text-6xl lg:text-7xl ${translated ? 'font-black' : ''}`}>
+                            <h1 className={`mt-6 text-[2.8rem] font-black leading-[0.95] tracking-tight text-slate-950 dark:text-white sm:text-6xl lg:text-7xl ${translated ? 'font-black' : ''}`}>
                                 Run properties with
                                 <span className="mt-3 block bg-[linear-gradient(135deg,#2563eb,#0ea5e9,#10b981)] bg-clip-text text-transparent">more control and less chaos</span>
                             </h1>
-                            <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 dark:text-slate-300 sm:text-lg">
+                            <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-600 dark:text-slate-300 sm:mt-6 sm:text-lg sm:leading-8">
                                 Nilayam brings owners, tenants, payments, maintenance, announcements, and local services into one product that feels like a real operating system instead of a loose collection of screens.
                             </p>
-                            <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+                            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                                 <Button onClick={() => navigate(session ? '/dashboard-router' : '/auth')} size="lg">{session ? text('landing.cta_dashboard', 'Go To Dashboard') : text('landing.cta_start', 'Start With Nilayam')}</Button>
                                 <button onClick={() => document.getElementById('feature-zone')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-700 transition hover:text-sky-700 dark:text-slate-300 dark:hover:text-white"><LayersIcon className="h-4 w-4" />Explore Product</button>
                             </div>
-                            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+                            <div className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3 sm:gap-4">
                                 <div className="rounded-[1.7rem] border border-blue-200 bg-blue-50/90 px-4 py-4 shadow-sm dark:border-blue-900/40 dark:bg-blue-950/20"><p className="text-2xl font-black text-blue-950 dark:text-blue-100">Owners</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-blue-700 dark:text-blue-300">Portfolio control</p></div>
                                 <div className="rounded-[1.7rem] border border-emerald-200 bg-emerald-50/90 px-4 py-4 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20"><p className="text-2xl font-black text-emerald-950 dark:text-emerald-100">Tenants</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">Resident experience</p></div>
                                 <div className="rounded-[1.7rem] border border-violet-200 bg-violet-50/90 px-4 py-4 shadow-sm dark:border-violet-900/40 dark:bg-violet-950/20"><p className="text-2xl font-black text-violet-950 dark:text-violet-100">AI</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-violet-700 dark:text-violet-300">Smarter operations</p></div>
@@ -353,7 +371,7 @@ const LandingPage: React.FC = () => {
                     </div>
                 </section>
 
-                <section id="feature-zone" className="px-4 py-20 sm:px-6 lg:px-8">
+                <section id="feature-zone" className="ornate-surface px-4 py-20 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl">
                         <Reveal className="mx-auto max-w-3xl text-center">
                             <p className="text-xs font-black uppercase tracking-[0.32em] text-sky-700 dark:text-sky-300">Built around real workflows</p>
@@ -377,7 +395,7 @@ const LandingPage: React.FC = () => {
                 </section>
 
                 <section className="px-4 py-20 sm:px-6 lg:px-8">
-                    <div className="mx-auto grid max-w-7xl gap-10 rounded-[2.8rem] border border-slate-200 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-[1fr_1fr] lg:p-12">
+                    <div className="ornate-panel mx-auto grid max-w-7xl gap-10 rounded-[2.8rem] border border-slate-200 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-[1fr_1fr] lg:p-12">
                         <Reveal>
                             <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-600 dark:text-emerald-300">How it fits together</p>
                             <h3 className="mt-4 text-4xl font-black tracking-tight text-slate-950 dark:text-white">One product, many connected moments</h3>
@@ -428,7 +446,17 @@ const LandingPage: React.FC = () => {
                         <LogoIcon className="h-5 w-5" />
                         <span className={`font-bold text-slate-700 dark:text-slate-200 ${translated ? 'font-black' : 'font-righteous'}`}>{text('app.name', 'Nilayam')}</span>
                         <span className="hidden h-4 w-px bg-slate-300 dark:bg-slate-700 md:block" />
-                        <span>A product of Siddhi Dynamics LLP</span>
+                        <span>
+                            A product of{' '}
+                            <a
+                                href="https://siddhidynamics.in"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-blue-600 dark:text-slate-200 dark:decoration-slate-600 dark:hover:text-blue-400"
+                            >
+                                Siddhi Dynamics LLP
+                            </a>
+                        </span>
                     </div>
                     <div>&copy; {new Date().getFullYear()} All rights reserved.</div>
                 </div>

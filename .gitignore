@@ -23,6 +23,10 @@ tsc_output.txt
 android/gradle_output.txt
 backend-java/target
 *.zip
+.env
+.env.test
+.env.production
+.env.staging
 
 # Editor directories and files
 .vscode/*

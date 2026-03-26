@@ -137,7 +137,10 @@ export const OWNER_NAV_LINKS = [
   { href: '/dashboard', labelKey: 'nav.dashboard', icon: <DashboardIcon className="w-5 h-5" /> },
   { href: '/properties', labelKey: 'nav.my_properties', icon: <PropertiesIcon className="w-5 h-5" /> },
   { href: '/tenants', labelKey: 'nav.tenants', icon: <UsersIcon className="w-5 h-5" /> },
+  { href: '/agreements', labelKey: 'nav.agreements', icon: <LeaseIcon className="w-5 h-5" /> },
+  { href: '/payments', labelKey: 'nav.payments', icon: <CreditCardIcon className="w-5 h-5" /> },
   { href: '/community', labelKey: 'nav.community', icon: <UsersIcon className="w-5 h-5" /> }, 
+  { href: '/community-events', labelKey: 'nav.events', icon: <CalendarDaysIcon className="w-5 h-5" /> },
   { href: '/financials', labelKey: 'nav.financials', icon: <FinancialAnalyticsIcon className="w-5 h-5" /> },
   { href: '/maintenance', labelKey: 'nav.maintenance', icon: <WrenchIcon className="w-5 h-5" /> },
   { href: '/reports', labelKey: 'nav.reports', icon: <ClipboardIcon className="w-5 h-5" /> },
@@ -148,6 +151,7 @@ export const OWNER_NAV_LINKS = [
 
 export const TENANT_NAV_LINKS = [
     { href: '/tenant-dashboard', labelKey: 'nav.home', icon: <HomeIcon className="w-5 h-5" /> },
+    { href: '/agreements', labelKey: 'nav.agreements', icon: <LeaseIcon className="w-5 h-5" /> },
     { href: '/tenant-maintenance', labelKey: 'nav.maintenance', icon: <WrenchIcon className="w-5 h-5" /> },
     { href: '/marketplace', labelKey: 'nav.marketplace', icon: <StoreIcon className="w-5 h-5" /> },
     { href: '/feedback', labelKey: 'nav.feedback', icon: <MessageSquareIcon className="w-5 h-5" /> },
@@ -155,8 +159,9 @@ export const TENANT_NAV_LINKS = [
 ];
 
 export const TENANT_COMMUNITY_LINKS = [
+    { href: '/community', labelKey: 'nav.community', icon: <UsersIcon className="w-5 h-5" />, disabled: false },
     { href: '/services', labelKey: 'nav.find_pros', icon: <BriefcaseIcon className="w-5 h-5" />, disabled: false },
-    { href: '#', labelKey: 'nav.events', icon: <CalendarDaysIcon className="w-5 h-5" />, disabled: true },
+    { href: '/community-events', labelKey: 'nav.events', icon: <CalendarDaysIcon className="w-5 h-5" />, disabled: false },
 ];
 
 export const PROPERTY_TYPE_CATEGORIES = {

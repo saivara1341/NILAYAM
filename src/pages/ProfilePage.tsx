@@ -31,9 +31,14 @@ const ProfilePage: React.FC = () => {
     // Payment Settings State
     const [upiId, setUpiId] = useState(profile?.payment_methods?.upiId || '');
     const [enableRazorpay, setEnableRazorpay] = useState(Boolean(profile?.payment_methods?.enableRazorpay));
+    const [razorpayRouteEnabled, setRazorpayRouteEnabled] = useState(Boolean(profile?.payment_methods?.razorpayRouteEnabled));
+    const [razorpayLinkedAccountId, setRazorpayLinkedAccountId] = useState(profile?.payment_methods?.razorpayLinkedAccountId || '');
+    const [settlementPreference, setSettlementPreference] = useState<PaymentMethods['settlementPreference']>(profile?.payment_methods?.settlementPreference || 'direct_owner');
+    const [payeeName, setPayeeName] = useState(profile?.payment_methods?.payeeName || profile?.full_name || '');
     const [mobileNumber, setMobileNumber] = useState(profile?.payment_methods?.mobileNumber || '');
     const [qrCodeUrl, setQrCodeUrl] = useState(profile?.payment_methods?.qrCodeUrl || '');
     const [paymentInstructions, setPaymentInstructions] = useState(profile?.payment_methods?.paymentInstructions || '');
+    const [settlementNotes, setSettlementNotes] = useState(profile?.payment_methods?.settlementNotes || '');
     const [bankDetails, setBankDetails] = useState<BankDetails>(profile?.payment_methods?.bankDetails || {
         accountHolder: '', accountNumber: '', ifsc: '', bankName: ''
     });
@@ -51,10 +56,15 @@ const ProfilePage: React.FC = () => {
         setBio(profile?.bio || '');
         setAvatarUrl(profile?.avatar_url || '');
         setEnableRazorpay(Boolean(profile?.payment_methods?.enableRazorpay));
+        setRazorpayRouteEnabled(Boolean(profile?.payment_methods?.razorpayRouteEnabled));
+        setRazorpayLinkedAccountId(profile?.payment_methods?.razorpayLinkedAccountId || '');
+        setSettlementPreference(profile?.payment_methods?.settlementPreference || 'direct_owner');
+        setPayeeName(profile?.payment_methods?.payeeName || profile?.full_name || '');
         setUpiId(profile?.payment_methods?.upiId || '');
         setMobileNumber(profile?.payment_methods?.mobileNumber || '');
         setQrCodeUrl(profile?.payment_methods?.qrCodeUrl || '');
         setPaymentInstructions(profile?.payment_methods?.paymentInstructions || '');
+        setSettlementNotes(profile?.payment_methods?.settlementNotes || '');
         setBankDetails(profile?.payment_methods?.bankDetails || {
             accountHolder: '', accountNumber: '', ifsc: '', bankName: ''
         });
@@ -137,11 +147,16 @@ const ProfilePage: React.FC = () => {
         try {
             const methods: PaymentMethods = {
                 enableRazorpay,
+                razorpayRouteEnabled,
+                razorpayLinkedAccountId: razorpayLinkedAccountId.trim(),
+                settlementPreference,
                 upiId: upiId.trim(),
                 mobileNumber: mobileNumber.trim(),
                 qrCodeUrl: qrCodeUrl.trim(),
                 paymentInstructions: paymentInstructions.trim(),
-                bankDetails: bankDetails
+                bankDetails: bankDetails,
+                payeeName: payeeName.trim(),
+                settlementNotes: settlementNotes.trim()
             };
             const updatedProfile = await updatePaymentMethods(methods);
             updateProfileState(updatedProfile);
@@ -405,10 +420,71 @@ const ProfilePage: React.FC = () => {
                                         <div>
                                             <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">Enable Razorpay checkout</p>
                                             <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
-                                                Turn this on only when your frontend key and backend payment API are deployed. {canUseRazorpayForOwner(profile?.payment_methods) ? 'Razorpay is currently available in this runtime.' : 'Right now the app will fall back to manual payment collection.'}
+                                                Enable this after `VITE_RAZORPAY_KEY_ID`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `VITE_API_BASE_URL` are deployed. {canUseRazorpayForOwner(profile?.payment_methods) ? 'Razorpay checkout is available in this runtime.' : 'Until then, tenants will continue using the manual UPI and proof-upload flow.'}
+                                            </p>
+                                            <p className="mt-2 text-xs font-semibold text-indigo-800 dark:text-indigo-200">
+                                                Standard Razorpay settles into the Razorpay business account connected to the checkout keys. To send money to each owner directly, you need linked accounts and Route-style transfers or split-settlement onboarding.
                                             </p>
                                         </div>
                                     </label>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div>
+                                        <label htmlFor="payeeName" className="block text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            Payee / Owner Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="payeeName"
+                                            value={payeeName}
+                                            onChange={(e) => setPayeeName(e.target.value)}
+                                            placeholder="Owner legal / payout name"
+                                            className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="settlementPreference" className="block text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            Preferred Settlement Flow
+                                        </label>
+                                        <select
+                                            id="settlementPreference"
+                                            value={settlementPreference}
+                                            onChange={(e) => setSettlementPreference(e.target.value as PaymentMethods['settlementPreference'])}
+                                            className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                        >
+                                            <option value="direct_owner">Direct owner settlement</option>
+                                            <option value="platform">Platform settlement</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4 space-y-3">
+                                    <label className="flex items-start gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={razorpayRouteEnabled}
+                                            onChange={(e) => setRazorpayRouteEnabled(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Owner linked account enabled</p>
+                                            <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                                                Turn this on only after the owner completes linked-account onboarding in Razorpay Route / partner settlement flow.
+                                            </p>
+                                        </div>
+                                    </label>
+                                    <div>
+                                        <label htmlFor="routeAccountId" className="block text-sm font-medium text-amber-900 dark:text-amber-200">
+                                            Razorpay Linked Account ID
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="routeAccountId"
+                                            value={razorpayLinkedAccountId}
+                                            onChange={(e) => setRazorpayLinkedAccountId(e.target.value)}
+                                            placeholder="acc_xxxxx or linked-account reference"
+                                            className="mt-1 block w-full px-3 py-2 border border-amber-300 dark:border-amber-800 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
@@ -472,6 +548,17 @@ const ProfilePage: React.FC = () => {
                                         value={paymentInstructions}
                                         onChange={(e) => setPaymentInstructions(e.target.value)}
                                         placeholder="Example: Pay to the UPI above, then upload the screenshot. I will verify the amount in my account and approve it."
+                                        className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="settlementNotes" className="block text-sm font-medium text-slate-600 dark:text-slate-400">Settlement Notes</label>
+                                    <textarea
+                                        id="settlementNotes"
+                                        rows={2}
+                                        value={settlementNotes}
+                                        onChange={(e) => setSettlementNotes(e.target.value)}
+                                        placeholder="Example: Direct owner settlement expected through linked account after KYC."
                                         className="mt-1 block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm bg-white dark:bg-slate-700 text-blue-950 dark:text-slate-200"
                                     />
                                 </div>
